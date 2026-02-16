@@ -1,0 +1,58 @@
+﻿:root {
+  --bg: #eaf0f7;
+  --surface: #ffffff;
+  --ink: #10243a;
+  --muted: #607086;
+  --line: #c5d3e3;
+  --brand: #0c2340;
+  --brand-2: #195188;
+  --radius: 18px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: linear-gradient(180deg,#dce7f2 0%,#edf3fa 100%);
+  color: var(--ink);
+}
+.stage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.phone {
+  width: 390px;
+  min-height: 844px;
+  background: var(--surface);
+  border-radius: 34px;
+  border: 8px solid #121922;
+  box-shadow: 0 20px 60px rgba(6, 24, 41, 0.25);
+  overflow: hidden;
+}
+.notch {
+  width: 160px;
+  height: 26px;
+  background: #121922;
+  margin: 8px auto 0;
+  border-radius: 0 0 14px 14px;
+}
+.content { padding: 14px 14px 20px; }
+.top { display:flex; justify-content:space-between; align-items:center; margin: 8px 0 12px; }
+.brand { font-weight: 800; letter-spacing: 0.12em; color: var(--brand); font-size: 18px; }
+.badge { font-size: 11px; background:#edf4fc; border:1px solid #bfd0e1; border-radius:99px; padding:4px 8px; }
+.title { font-size: 22px; margin: 0 0 10px; }
+.card { background:#fbfdff; border:1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 10px; }
+.kpi { font-size: 28px; font-weight: 800; margin: 0 0 6px; color: var(--brand); }
+.btn { display:block; width:100%; border:0; border-radius: 12px; padding: 12px; font-weight: 700; background: linear-gradient(145deg,var(--brand),var(--brand-2)); color:white; margin-top:8px; }
+.btn.alt { background:#f1f6fc; color:var(--brand); border:1px solid #bfd0e3; }
+.input { width:100%; border:1px solid var(--line); border-radius: 12px; padding: 11px; font-size: 16px; }
+.row { display:flex; gap:8px; flex-wrap:wrap; }
+.chip { padding:6px 9px; border:1px solid var(--line); border-radius: 99px; font-size:12px; background:#f7fbff; }
+.item { border:1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; background:#fff; }
+.sub { color: var(--muted); font-size: 13px; }
+
+.brand-tag { font-size: 11px; letter-spacing: 0.22em; text-transform: none; color: var(--muted); margin-top: 2px; }
+.brand-inverse { color: #f4f7fb !important; }
+.brand-tag-inverse { color: rgba(239,246,255,0.78); }
+

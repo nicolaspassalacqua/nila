@@ -1,0 +1,9 @@
+﻿flowchart LR
+    FE[Frontend] --> API[Django API]
+    API --> DB[(PostgreSQL)]
+    API --> WL[waitlist]
+    API --> NT[notifications]
+    API --> WA[whatsapp]
+    API --> POS[pos]
+    NT --> Q[(queue/worker)]
+    WA --> Q

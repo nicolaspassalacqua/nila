@@ -1,0 +1,13 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/client/page": "app/client/page.js",
+  "/client/dashboard/page": "app/client/dashboard/page.js",
+  "/client/marketplace/page": "app/client/marketplace/page.js",
+  "/page": "app/page.js",
+  "/professional/page": "app/professional/page.js",
+  "/client/workspace/page": "app/client/workspace/page.js",
+  "/professional/dashboard/page": "app/professional/dashboard/page.js",
+  "/login/page": "app/login/page.js",
+  "/professional/tenants/page": "app/professional/tenants/page.js",
+  "/professional/workspace/page": "app/professional/workspace/page.js"
+}

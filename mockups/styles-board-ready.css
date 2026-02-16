@@ -1,0 +1,168 @@
+﻿:root {
+  --bg-1: #eef2f7;
+  --bg-2: #f8fafd;
+  --surface: #ffffff;
+  --surface-soft: #f6f9fc;
+  --ink: #0f2033;
+  --muted: #516173;
+  --line: #c4d1e0;
+  --brand: #1a2046;
+  --brand-2: #2a3568;
+  --accent: #0a84ff;
+  --success: #167f53;
+  --warning: #ba6b12;
+  --radius-xl: 10px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
+  --shadow-1: 0 10px 28px rgba(11, 31, 54, 0.1);
+  --shadow-2: 0 4px 12px rgba(11, 31, 54, 0.08);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Arial", sans-serif;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 100%);
+  min-height: 100vh;
+}
+.app { max-width: 1200px; margin: 20px auto; padding: 24px; }
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #d9e2ec;
+}
+.brand {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--brand);
+}
+.subtitle { color: var(--muted); font-size: 14px; }
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: 18px;
+  box-shadow: var(--shadow-1);
+}
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.card {
+  background: linear-gradient(180deg, #ffffff 0%, var(--surface-soft) 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: var(--shadow-2);
+}
+.title { font-size: 22px; margin: 0 0 10px; }
+.kpi { font-size: 34px; font-weight: 800; margin: 0 0 8px; color: var(--brand); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  background: linear-gradient(145deg, var(--brand) 0%, var(--brand-2) 100%);
+  color: white;
+}
+.btn.alt {
+  background: #f1f6fc;
+  color: var(--brand);
+  border-color: #bfd0e3;
+}
+.badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid #b9cadc;
+  color: #1b3f66;
+  background: #edf4fc;
+  font-weight: 700;
+}
+.input {
+  width: 100%;
+  border: 1px solid #c0cfdf;
+  border-radius: 6px;
+  padding: 11px;
+  font-size: 15px;
+  color: var(--ink);
+  background: #fff;
+}
+.list { display: grid; gap: 8px; }
+.item {
+  border: 1px solid #c9d5e3;
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: #fbfdff;
+}
+.notice.ok { color: var(--success); font-weight: 700; }
+.notice.warn { color: var(--warning); font-weight: 700; }
+.a11y {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px dashed #c7d4e1;
+  padding-top: 8px;
+}
+.sidebar-layout { display: grid; grid-template-columns: 230px 1fr; gap: 12px; }
+.sidebar {
+  background: linear-gradient(180deg, #0b1f36 0%, #123256 100%);
+  color: #e5eef8;
+  border-radius: var(--radius-xl);
+  padding: 16px;
+  box-shadow: var(--shadow-1);
+}
+.menu { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.menu li strong { color: #ffffff; }
+h3 { margin: 0 0 8px; }
+p { margin: 0 0 8px; }
+
+.cover {
+  min-height: 960px;
+  display: grid;
+  align-content: space-between;
+}
+.cover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.cover-title {
+  font-size: 46px;
+  font-weight: 800;
+  color: var(--brand);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+.cover-sub {
+  margin: 10px 0 0;
+  font-size: 20px;
+  color: #2f4b68;
+}
+.cover-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 12px;
+}
+.cover-footer {
+  display: flex;
+  justify-content: space-between;
+  color: #3f5670;
+  font-size: 14px;
+  border-top: 2px solid #d9e2ec;
+  padding-top: 12px;
+}
+@media (max-width: 900px) {
+  .grid { grid-template-columns: 1fr; }
+  .sidebar-layout { grid-template-columns: 1fr; }
+  .cover-kpis { grid-template-columns: 1fr; }
+}
+
+.brand-tag { font-size: 11px; letter-spacing: 0.22em; text-transform: none; color: var(--muted); margin-top: 2px; }
+.brand-inverse { color: #f4f7fb !important; }
+.brand-tag-inverse { color: rgba(239,246,255,0.78); }
+
+

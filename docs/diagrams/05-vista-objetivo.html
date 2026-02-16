@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { margin: 0; background: #f4f7fb; font-family: Segoe UI, Arial, sans-serif; }
+    .wrap { width: 1800px; min-height: 1000px; padding: 40px; }
+    .title { font-size: 28px; font-weight: 700; color: #1a2046; margin-bottom: 14px; letter-spacing: .02em; }
+    .box { background: #fff; border: 1px solid #d5dfec; border-radius: 14px; padding: 20px; box-shadow: 0 8px 24px rgba(26, 32, 70, .08); }
+    .mermaid { font-size: 18px; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: { primaryColor: '#eef3fa', primaryTextColor:'#14263f', lineColor:'#26486f', fontFamily: 'Segoe UI' } });
+    window.addEventListener('load', () => {
+      setTimeout(() => document.body.setAttribute('data-ready', '1'), 1200);
+    });
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">05 Vista Objetivo</div>
+    <div class="box">
+      <pre class="mermaid">﻿flowchart LR
+    FE[Frontend] --&gt; API[Django API]
+    API --&gt; DB[(PostgreSQL)]
+    API --&gt; WL[waitlist]
+    API --&gt; NT[notifications]
+    API --&gt; WA[whatsapp]
+    API --&gt; POS[pos]
+    NT --&gt; Q[(queue/worker)]
+    WA --&gt; Q
+</pre>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,15 @@
+﻿sequenceDiagram
+    participant Pro as Profesional
+    participant FE as Frontend
+    participant API as Django API
+    participant DB as PostgreSQL
+    Pro->>FE: crea cliente y servicio
+    FE->>API: POST /api/clients/ (X-Tenant-ID)
+    API->>DB: inserta client
+    FE->>API: POST /api/services/ (X-Tenant-ID)
+    API->>DB: inserta service
+    Pro->>FE: crea turno
+    FE->>API: POST /api/appointments/ (X-Tenant-ID)
+    API->>DB: inserta appointment
+    DB-->>API: OK
+    API-->>FE: turno creado

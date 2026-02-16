@@ -1,0 +1,10 @@
+﻿flowchart LR
+    U1[Cliente Web/Mobile] --> FE[Frontend Next.js]
+    U2[Profesional Web/Mobile] --> FE
+    FE -->|HTTPS / JWT| API[Django API / DRF]
+    API --> DB[(PostgreSQL)]
+    API --> AUTH[Auth JWT]
+    API --> TEN[Tenancy / Memberships]
+    API --> MKT[Marketplace Services]
+    API --> CRM[CRM Clients]
+    API --> BKG[Booking Appointments]

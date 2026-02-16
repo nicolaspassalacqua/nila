@@ -1,0 +1,7 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/login/page": "app/login/page.js",
+  "/professional/tenants/page": "app/professional/tenants/page.js",
+  "/professional/dashboard/page": "app/professional/dashboard/page.js",
+  "/professional/workspace/page": "app/professional/workspace/page.js"
+}

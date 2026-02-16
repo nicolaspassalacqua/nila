@@ -1,0 +1,16 @@
+﻿sequenceDiagram
+    participant User as Usuario
+    participant FE as Frontend
+    participant API as Django API
+    participant DB as PostgreSQL
+    User->>FE: Login (email/password)
+    FE->>API: POST /api/auth/token/
+    API->>DB: valida credenciales
+    DB-->>API: usuario valido
+    API-->>FE: access + refresh JWT
+    User->>FE: operar en tenant X
+    FE->>API: GET /api/services/ + JWT + X-Tenant-ID
+    API->>API: tenant_access valida membership
+    API->>DB: consulta por tenant
+    DB-->>API: resultados
+    API-->>FE: respuesta autorizada
