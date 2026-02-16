@@ -1,0 +1,42 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs and temp
+*.log
+*.tmp
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# Django local DB
+backend/db.sqlite3
+
+# Node / Next
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Misc local artifacts
+temp_api_dump.txt
+-r
+11.10.0
+26.0.1
+docker
