@@ -46,10 +46,12 @@ class TenantSerializer(serializers.ModelSerializer):
             "company",
             "company_name",
             "name",
+            "photo_url",
             "address",
             "description",
             "revenue_model",
             "establishment_type",
+            "court_config",
             "capacity",
             "opening_hours",
             "cancellation_policy",
@@ -71,6 +73,45 @@ class TenantSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("La capacidad debe ser mayor o igual a 1.")
         return value
 
+    def validate_court_config(self, value):
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("La configuracion de canchas debe ser una lista.")
+
+        allowed_sports = {"futbol", "padel", "tenis", "otro"}
+        normalized = []
+        for index, raw_item in enumerate(value):
+            if not isinstance(raw_item, dict):
+                raise serializers.ValidationError("Cada cancha debe ser un objeto valido.")
+
+            name = str(raw_item.get("name") or "").strip() or f"Cancha {index + 1}"
+            sport = str(raw_item.get("sport") or "otro").strip().lower() or "otro"
+            if sport not in allowed_sports:
+                raise serializers.ValidationError(
+                    f"Deporte no valido en cancha {index + 1}. Usa futbol, padel, tenis u otro."
+                )
+
+            raw_capacity = raw_item.get("capacity", 1)
+            try:
+                capacity = int(raw_capacity)
+            except (TypeError, ValueError):
+                raise serializers.ValidationError(f"La capacidad de la cancha {index + 1} debe ser numerica.")
+
+            if capacity < 1:
+                raise serializers.ValidationError(
+                    f"La capacidad de la cancha {index + 1} debe ser mayor o igual a 1."
+                )
+
+            normalized.append(
+                {
+                    "name": name,
+                    "sport": sport,
+                    "capacity": capacity,
+                }
+            )
+        return normalized
+
     def validate_tolerance_minutes(self, value):
         if value < 0 or value > 180:
             raise serializers.ValidationError("La tolerancia debe estar entre 0 y 180 minutos.")
@@ -80,6 +121,17 @@ class TenantSerializer(serializers.ModelSerializer):
         if value < 0 or value > 100:
             raise serializers.ValidationError("La penalizacion debe estar entre 0 y 100.")
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        establishment_type = attrs.get(
+            "establishment_type",
+            getattr(self.instance, "establishment_type", Tenant.EstablishmentType.SALA),
+        )
+        court_config = attrs.get("court_config", getattr(self.instance, "court_config", []))
+        if establishment_type == Tenant.EstablishmentType.CANCHA and isinstance(court_config, list) and court_config:
+            attrs["capacity"] = sum(int(court.get("capacity", 1)) for court in court_config)
+        return attrs
 
 
 class TenantMembershipSerializer(serializers.ModelSerializer):

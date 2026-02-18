@@ -33,6 +33,17 @@ export default function ProfessionalWorkspacePage() {
 
   const [serviceName, setServiceName] = useState("Clase Pilates");
   const [serviceDiscipline, setServiceDiscipline] = useState("Pilates");
+  const [serviceType, setServiceType] = useState("turno");
+  const [serviceDurationMin, setServiceDurationMin] = useState("60");
+  const [servicePrice, setServicePrice] = useState("12000");
+  const [serviceCapacity, setServiceCapacity] = useState("1");
+  const [courtMinAdvanceHours, setCourtMinAdvanceHours] = useState("2");
+  const [courtCancellationHours, setCourtCancellationHours] = useState("24");
+  const [courtPeakStart, setCourtPeakStart] = useState("18:00");
+  const [courtPeakEnd, setCourtPeakEnd] = useState("22:00");
+  const [courtPeakPrice, setCourtPeakPrice] = useState("18000");
+  const [courtPrepayPercent, setCourtPrepayPercent] = useState("30");
+  const [selectedCourtNames, setSelectedCourtNames] = useState<string[]>([]);
 
   const [clientName, setClientName] = useState("Maria Perez");
   const [clientEmail, setClientEmail] = useState("maria@example.com");
@@ -58,6 +69,9 @@ export default function ProfessionalWorkspacePage() {
   const [orderIdForPayment, setOrderIdForPayment] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("12000");
   const [appointmentIdForReminder, setAppointmentIdForReminder] = useState("");
+  const activeTenant = tenants.find((item) => String(item.id) === tenantId);
+  const tenantIsCourt = activeTenant?.establishment_type === "cancha";
+  const tenantCourts = Array.isArray(activeTenant?.court_config) ? activeTenant.court_config : [];
 
   useEffect(() => {
     if (!INTERNAL_TOOLS_ENABLED) {
@@ -71,8 +85,30 @@ export default function ProfessionalWorkspacePage() {
     setTenantId(savedTenant);
   }, [router]);
 
+  useEffect(() => {
+    if (!tenantIsCourt) {
+      setServiceType("turno");
+      setSelectedCourtNames([]);
+      return;
+    }
+    setServiceType("alquiler_cancha");
+    setServiceDiscipline("Canchas");
+    const availableCourtNames = tenantCourts
+      .map((court: any) => String(court?.name || "").trim())
+      .filter(Boolean);
+    setSelectedCourtNames((current) => current.filter((name) => availableCourtNames.includes(name)));
+  }, [tenantIsCourt, tenantId, tenantCourts]);
+
   if (!INTERNAL_TOOLS_ENABLED) {
     return null;
+  }
+
+  function toggleCourtSelection(courtName: string) {
+    setSelectedCourtNames((current) =>
+      current.includes(courtName)
+        ? current.filter((name) => name !== courtName)
+        : [...current, courtName]
+    );
   }
 
   function persistSession(nextToken: string, nextTenantId?: string) {
@@ -145,11 +181,43 @@ export default function ProfessionalWorkspacePage() {
 
   async function createService() {
     try {
+      const durationMin = Number(serviceDurationMin || 60);
+      const price = Number(servicePrice || 0);
+      const capacity = Number(serviceCapacity || 1);
+      const payload: any = {
+        name: serviceName,
+        discipline: serviceDiscipline,
+        duration_min: durationMin,
+        price,
+        capacity,
+        is_online: false,
+        service_type: serviceType,
+      };
+
+      if (tenantIsCourt || serviceType === "alquiler_cancha") {
+        payload.service_type = "alquiler_cancha";
+        payload.discipline = "Canchas";
+        payload.service_config = {
+          booking_mode: "per_court",
+          min_advance_hours: Number(courtMinAdvanceHours || 2),
+          cancellation_hours: Number(courtCancellationHours || 24),
+          prepay_percent: Number(courtPrepayPercent || 0),
+          peak_pricing: {
+            start: courtPeakStart,
+            end: courtPeakEnd,
+            peak_price: Number(courtPeakPrice || 0),
+          },
+          included_courts: tenantCourts.filter((court: any) =>
+            selectedCourtNames.includes(String(court?.name || ""))
+          ),
+        };
+      }
+
       await apiRequest("/services/", {
         method: "POST",
         token,
         tenantId,
-        body: { name: serviceName, discipline: serviceDiscipline, duration_min: 60, price: 12000, is_online: false },
+        body: payload,
       });
       setLog("Servicio creado");
       await refreshAll();
@@ -410,10 +478,108 @@ export default function ProfessionalWorkspacePage() {
           <h2>3) Servicios</h2>
           <div className="formGrid">
             <input className="input" value={serviceName} onChange={(e) => setServiceName(e.target.value)} placeholder="Servicio" />
-            <input className="input" value={serviceDiscipline} onChange={(e) => setServiceDiscipline(e.target.value)} placeholder="Disciplina" />
+            <select className="select" value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+              <option value="turno">Turno</option>
+              <option value="clase_grupal">Clase grupal</option>
+              <option value="tratamiento">Tratamiento</option>
+              <option value="alquiler_cancha">Alquiler cancha</option>
+            </select>
             <button className="linkBtn" onClick={createService}>Crear servicio</button>
           </div>
-          <ul className="list">{services.map((s) => <li key={s.id}>{s.id} - {s.name}</li>)}</ul>
+          <div className="formGrid" style={{ marginTop: 8 }}>
+            <input className="input" value={serviceDiscipline} onChange={(e) => setServiceDiscipline(e.target.value)} placeholder="Disciplina" />
+            <input className="input" type="number" min={15} value={serviceDurationMin} onChange={(e) => setServiceDurationMin(e.target.value)} placeholder="Duracion (min)" />
+            <input className="input" type="number" min={0} value={servicePrice} onChange={(e) => setServicePrice(e.target.value)} placeholder="Precio base" />
+          </div>
+          <div className="formGrid" style={{ marginTop: 8 }}>
+            <input className="input" type="number" min={1} value={serviceCapacity} onChange={(e) => setServiceCapacity(e.target.value)} placeholder="Capacidad" />
+            <div />
+            <div />
+          </div>
+          {tenantIsCourt || serviceType === "alquiler_cancha" ? (
+            <section className="courtBuilder">
+              <div className="courtBuilderHeader">
+                <div>
+                  <h3>MVP alquiler de cancha</h3>
+                  <p className="small">Configura reglas operativas para reservas de canchas.</p>
+                </div>
+                <div className="courtSummaryChips">
+                  <span className="badge">{tenantCourts.length} canchas en sucursal</span>
+                  <span className="badge">{selectedCourtNames.length} incluidas en servicio</span>
+                </div>
+              </div>
+
+              <div className="formGrid" style={{ marginTop: 8 }}>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={courtMinAdvanceHours}
+                  onChange={(e) => setCourtMinAdvanceHours(e.target.value)}
+                  placeholder="Anticipo minimo (horas)"
+                />
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={courtCancellationHours}
+                  onChange={(e) => setCourtCancellationHours(e.target.value)}
+                  placeholder="Cancelacion sin cargo (horas)"
+                />
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={courtPrepayPercent}
+                  onChange={(e) => setCourtPrepayPercent(e.target.value)}
+                  placeholder="Prepago (%)"
+                />
+              </div>
+
+              <div className="formGrid" style={{ marginTop: 8 }}>
+                <input className="input" type="time" value={courtPeakStart} onChange={(e) => setCourtPeakStart(e.target.value)} />
+                <input className="input" type="time" value={courtPeakEnd} onChange={(e) => setCourtPeakEnd(e.target.value)} />
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={courtPeakPrice}
+                  onChange={(e) => setCourtPeakPrice(e.target.value)}
+                  placeholder="Precio franja pico"
+                />
+              </div>
+
+              <p className="small" style={{ marginTop: 8 }}>Canchas incluidas en este servicio</p>
+              <div className="chipRow" style={{ marginTop: 6 }}>
+                {tenantCourts.length === 0 ? (
+                  <span className="small">Esta sucursal no tiene canchas definidas en onboarding.</span>
+                ) : (
+                  tenantCourts.map((court: any, index: number) => {
+                    const courtName = String(court?.name || `Cancha ${index + 1}`);
+                    const selected = selectedCourtNames.includes(courtName);
+                    return (
+                      <button
+                        key={`${courtName}-${index}`}
+                        type="button"
+                        className={`chip ${selected ? "active" : ""}`}
+                        onClick={() => toggleCourtSelection(courtName)}
+                      >
+                        {courtName}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          ) : null}
+          <ul className="list">
+            {services.map((s) => (
+              <li key={s.id}>
+                {s.id} - {s.name} [{s.service_type}] - ARS {s.price} - {s.duration_min} min
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section className="card">

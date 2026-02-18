@@ -71,10 +71,12 @@ class Tenant(TimeStampedModel):
         blank=True,
     )
     name = models.CharField(max_length=140)
+    photo_url = models.URLField(max_length=500, blank=True, default="")
     address = models.CharField(max_length=220, blank=True, default="")
     description = models.TextField(blank=True, default="")
     revenue_model = models.CharField(max_length=24, choices=RevenueModel.choices, default=RevenueModel.MIXTO)
     establishment_type = models.CharField(max_length=20, choices=EstablishmentType.choices, default=EstablishmentType.SALA)
+    court_config = models.JSONField(default=list, blank=True)
     capacity = models.PositiveIntegerField(default=1)
     opening_hours = models.CharField(max_length=220, blank=True, default="")
     cancellation_policy = models.CharField(max_length=220, blank=True, default="")

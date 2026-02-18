@@ -33,10 +33,12 @@ type Tenant = {
   id: number;
   name: string;
   company_name?: string;
+  photo_url?: string;
   address?: string;
   description?: string;
   revenue_model: string;
   establishment_type: string;
+  court_config: CourtConfig[];
   capacity: number;
   opening_hours: string;
   cancellation_policy: string;
@@ -48,6 +50,14 @@ type Tenant = {
   slug: string;
   plan: string;
   is_active: boolean;
+};
+
+type CourtSport = "futbol" | "padel" | "tenis" | "otro";
+
+type CourtConfig = {
+  name: string;
+  sport: CourtSport;
+  capacity: number;
 };
 
 type SetupStatus = {
@@ -94,11 +104,14 @@ export default function ProfessionalTenantsPage() {
   const [companyDescription, setCompanyDescription] = useState("");
 
   const [name, setName] = useState("Sucursal Centro");
+  const [photoUrl, setPhotoUrl] = useState("");
   const [address, setAddress] = useState("Av. Principal 123, Ciudad");
   const [description, setDescription] = useState("Establecimiento orientado a servicios profesionales.");
   const [revenueModel, setRevenueModel] = useState("mixto");
   const [establishmentType, setEstablishmentType] = useState("sala");
   const [capacity, setCapacity] = useState("1");
+  const [courtCount, setCourtCount] = useState("1");
+  const [courts, setCourts] = useState<CourtConfig[]>([{ name: "Cancha 1", sport: "futbol", capacity: 10 }]);
   const [selectedDays, setSelectedDays] = useState<string[]>(["lun", "mar", "mie", "jue", "vie"]);
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("20:00");
@@ -140,11 +153,20 @@ export default function ProfessionalTenantsPage() {
   useEffect(() => {
     if (!activeTenant) return;
     setName(activeTenant.name || "");
+    setPhotoUrl(activeTenant.photo_url || "");
     setAddress(activeTenant.address || "");
     setDescription(activeTenant.description || "");
     setRevenueModel(activeTenant.revenue_model || "mixto");
     setEstablishmentType(activeTenant.establishment_type || "sala");
     setCapacity(String(activeTenant.capacity || 1));
+    const loadedCourts = normalizeCourtConfig(activeTenant.court_config);
+    if (loadedCourts.length > 0) {
+      setCourts(loadedCourts);
+      setCourtCount(String(loadedCourts.length));
+    } else {
+      setCourts([defaultCourt(0)]);
+      setCourtCount("1");
+    }
     const loadedOpeningHours = activeTenant.opening_hours || "";
     setOpeningHours(loadedOpeningHours);
     const parsedSchedule = parseSchedule(loadedOpeningHours);
@@ -167,6 +189,12 @@ export default function ProfessionalTenantsPage() {
     setPrepayRequired(Boolean(activeTenant.prepay_required));
     setCancellationPenaltyPercent(activeTenant.cancellation_penalty_percent || "0");
   }, [activeTenant]);
+
+  useEffect(() => {
+    if (establishmentType !== "cancha") return;
+    const total = totalCourtCapacity(courts);
+    setCapacity(String(total > 0 ? total : 1));
+  }, [establishmentType, courts]);
 
   async function refresh(activeToken = token, selectedTenantId = activeTenantId) {
     try {
@@ -249,11 +277,13 @@ export default function ProfessionalTenantsPage() {
         token,
         body: {
           name,
+          photo_url: photoUrl,
           address,
           description,
           revenue_model: revenueModel,
           establishment_type: establishmentType,
-          capacity: Number(capacity || 1),
+          court_config: establishmentType === "cancha" ? normalizeCourtConfig(courts) : [],
+          capacity: establishmentType === "cancha" ? totalCourtCapacity(courts) || 1 : Number(capacity || 1),
           opening_hours: composeSchedule(),
           cancellation_policy: cancellationPolicy,
           tolerance_minutes: Number(toleranceMinutes || 10),
@@ -294,11 +324,13 @@ export default function ProfessionalTenantsPage() {
         token,
         body: {
           name,
+          photo_url: photoUrl,
           address,
           description,
           revenue_model: revenueModel,
           establishment_type: establishmentType,
-          capacity: Number(capacity || 1),
+          court_config: establishmentType === "cancha" ? normalizeCourtConfig(courts) : [],
+          capacity: establishmentType === "cancha" ? totalCourtCapacity(courts) || 1 : Number(capacity || 1),
           opening_hours: composeSchedule(),
           cancellation_policy: cancellationPolicy,
           tolerance_minutes: Number(toleranceMinutes || 10),
@@ -311,18 +343,27 @@ export default function ProfessionalTenantsPage() {
       });
       await refresh(token, String(activeTenant.id));
       setLog(`Establecimiento actualizado: ${name}`);
+      setFeedback({ type: "ok", text: `Cambios guardados correctamente en ${name}.` });
+      setDrawerFeedback(null);
+      closeBranchDrawer();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error: any) {
       setLog(`Error actualizando establecimiento: ${error.message}`);
+      const reason = parseApiReason(error);
+      setDrawerFeedback({ type: "error", text: `No se pudieron guardar los cambios. Motivo: ${reason}` });
     }
   }
 
   function resetBranchForm() {
     setName("Sucursal Centro");
+    setPhotoUrl("");
     setAddress("Av. Principal 123, Ciudad");
     setDescription("Establecimiento orientado a servicios profesionales.");
     setRevenueModel("mixto");
     setEstablishmentType("sala");
     setCapacity("1");
+    setCourtCount("1");
+    setCourts([defaultCourt(0)]);
     setSelectedDays(["lun", "mar", "mie", "jue", "vie"]);
     setOpenTime("08:00");
     setCloseTime("20:00");
@@ -356,11 +397,20 @@ export default function ProfessionalTenantsPage() {
     setActiveTenantId(String(tenant.id));
     setActiveTenant(String(tenant.id));
     setName(tenant.name || "");
+    setPhotoUrl(tenant.photo_url || "");
     setAddress(tenant.address || "");
     setDescription(tenant.description || "");
     setRevenueModel(tenant.revenue_model || "mixto");
     setEstablishmentType(tenant.establishment_type || "sala");
     setCapacity(String(tenant.capacity || 1));
+    const loadedCourts = normalizeCourtConfig(tenant.court_config);
+    if (loadedCourts.length > 0) {
+      setCourts(loadedCourts);
+      setCourtCount(String(loadedCourts.length));
+    } else {
+      setCourts([defaultCourt(0)]);
+      setCourtCount("1");
+    }
     const loadedOpeningHours = tenant.opening_hours || "";
     setOpeningHours(loadedOpeningHours);
     const parsedSchedule = parseSchedule(loadedOpeningHours);
@@ -420,12 +470,11 @@ export default function ProfessionalTenantsPage() {
     }
   }
 
-  async function useTenant(id: number) {
+  function goToServicesWithTenant(id: number) {
     const idAsString = String(id);
     setActiveTenantId(idAsString);
     setActiveTenant(idAsString);
-    await refresh(token, idAsString);
-    setLog(`Establecimiento activo: ${idAsString}`);
+    router.push("/professional/services");
   }
 
   function logout() {
@@ -500,6 +549,103 @@ export default function ProfessionalTenantsPage() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
     return normalized || "sucursal";
+  }
+
+  function defaultCapacityBySport(sport: CourtSport): number {
+    if (sport === "futbol") return 14;
+    if (sport === "padel") return 4;
+    if (sport === "tenis") return 4;
+    return 6;
+  }
+
+  function formatCourtSport(sport: CourtSport): string {
+    if (sport === "futbol") return "Futbol";
+    if (sport === "padel") return "Padel";
+    if (sport === "tenis") return "Tenis";
+    return "Otro";
+  }
+
+  function defaultCourt(index: number, sport: CourtSport = "futbol"): CourtConfig {
+    return {
+      name: `Cancha ${index + 1}`,
+      sport,
+      capacity: defaultCapacityBySport(sport),
+    };
+  }
+
+  function normalizeCourtConfig(raw: unknown): CourtConfig[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((item, index) => {
+        if (!item || typeof item !== "object") return null;
+        const source = item as Record<string, unknown>;
+        const rawSport = String(source.sport || "otro").toLowerCase();
+        const sport: CourtSport =
+          rawSport === "futbol" || rawSport === "padel" || rawSport === "tenis" ? rawSport : "otro";
+        const parsedCapacity = Number(source.capacity || 1);
+        const resolvedCapacity = Number.isFinite(parsedCapacity) && parsedCapacity > 0 ? parsedCapacity : 1;
+        const name = String(source.name || "").trim() || `Cancha ${index + 1}`;
+        return { name, sport, capacity: resolvedCapacity };
+      })
+      .filter((item): item is CourtConfig => Boolean(item));
+  }
+
+  function totalCourtCapacity(items: CourtConfig[]): number {
+    return items.reduce((sum, court) => sum + Number(court.capacity || 0), 0);
+  }
+
+  function syncCourtsFromCount(nextCountRaw: string) {
+    const parsed = Number(nextCountRaw);
+    const nextCount = Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+    setCourtCount(String(nextCount));
+    setCourts((current) => {
+      const draft = [...current];
+      if (draft.length < nextCount) {
+        for (let index = draft.length; index < nextCount; index += 1) {
+          draft.push(defaultCourt(index));
+        }
+      } else if (draft.length > nextCount) {
+        draft.length = nextCount;
+      }
+      return draft.map((court, index) => ({
+        ...court,
+        name: court.name?.trim() ? court.name : `Cancha ${index + 1}`,
+      }));
+    });
+  }
+
+  function updateCourt(index: number, patch: Partial<CourtConfig>) {
+    setCourts((current) =>
+      current.map((court, idx) => {
+        if (idx !== index) return court;
+        return { ...court, ...patch };
+      })
+    );
+  }
+
+  function addCourt() {
+    setCourts((current) => {
+      const next = [...current, defaultCourt(current.length)];
+      setCourtCount(String(next.length));
+      return next;
+    });
+  }
+
+  function addCourtBySport(sport: CourtSport) {
+    setCourts((current) => {
+      const next = [...current, defaultCourt(current.length, sport)];
+      setCourtCount(String(next.length));
+      return next;
+    });
+  }
+
+  function removeCourt(index: number) {
+    setCourts((current) => {
+      if (current.length <= 1) return current;
+      const next = current.filter((_, idx) => idx !== index);
+      setCourtCount(String(next.length));
+      return next;
+    });
   }
 
   function formatRevenueModel(value: string): string {
@@ -603,6 +749,13 @@ export default function ProfessionalTenantsPage() {
           : (setupStatus?.subscription_plans_count || 0) === 0
             ? "Crea tu primera suscripcion"
             : "Onboarding completado";
+  const courtsBySport = courts.reduce(
+    (acc, court) => {
+      acc[court.sport] += 1;
+      return acc;
+    },
+    { futbol: 0, padel: 0, tenis: 0, otro: 0 } as Record<CourtSport, number>
+  );
 
   return (
     <main className="onboardingPage">
@@ -639,7 +792,6 @@ export default function ProfessionalTenantsPage() {
         </ul>
 
         <div className="linkRow onboardingActions">
-          <Link className="linkBtn" href="/professional/workspace">Configurar servicios</Link>
           <button className="mutedBtn" onClick={saveActiveTenant} disabled={!companyConfigured || !activeTenant}>Activar cobros</button>
           <Link className="mutedBtn" href="/professional/workspace">Crear suscripcion</Link>
         </div>
@@ -749,7 +901,7 @@ export default function ProfessionalTenantsPage() {
                       <td>{tenant.capacity}</td>
                       <td>
                         <div className="tableActions">
-                          <button className="mutedBtn" onClick={() => void useTenant(tenant.id)}>Seleccionar</button>
+                          <button className="linkBtn" onClick={() => goToServicesWithTenant(tenant.id)}>Configurar servicios</button>
                           <button className="mutedBtn" onClick={() => startEditBranch(tenant)}>Editar</button>
                           <button className="mutedBtn" onClick={() => void deleteTenant(tenant.id)}>Eliminar</button>
                         </div>
@@ -796,10 +948,115 @@ export default function ProfessionalTenantsPage() {
                 </select>
               </div>
               <div className="formGrid" style={{ marginTop: 8 }}>
-                <input className="input" type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="Capacidad (personas/recursos)" />
+                <input
+                  className="input"
+                  value={photoUrl}
+                  onChange={(e) => setPhotoUrl(e.target.value)}
+                  placeholder="URL foto establecimiento (opcional)"
+                />
                 <div />
                 <div />
               </div>
+              {establishmentType === "cancha" ? (
+                <>
+                  <section className="courtBuilder">
+                    <div className="courtBuilderHeader">
+                      <div>
+                        <h3>Configuracion de canchas</h3>
+                        <p className="small">Define canchas individuales y su capacidad.</p>
+                      </div>
+                      <div className="courtSummaryChips">
+                        <span className="badge">{courts.length} canchas</span>
+                        <span className="badge">{totalCourtCapacity(courts)} capacidad total</span>
+                        {courtsBySport.futbol > 0 ? <span className="badge">{courtsBySport.futbol} Futbol</span> : null}
+                        {courtsBySport.padel > 0 ? <span className="badge">{courtsBySport.padel} Padel</span> : null}
+                        {courtsBySport.tenis > 0 ? <span className="badge">{courtsBySport.tenis} Tenis</span> : null}
+                      </div>
+                    </div>
+
+                    <div className="courtTopControls">
+                      <input
+                        className="input"
+                        type="number"
+                        min={1}
+                        value={courtCount}
+                        onChange={(e) => setCourtCount(e.target.value)}
+                        placeholder="Cantidad de canchas"
+                      />
+                      <button className="mutedBtn" type="button" onClick={() => syncCourtsFromCount(courtCount)}>
+                        Ajustar cantidad
+                      </button>
+                      <button className="mutedBtn" type="button" onClick={() => addCourtBySport("futbol")}>
+                        + Futbol
+                      </button>
+                      <button className="mutedBtn" type="button" onClick={() => addCourtBySport("padel")}>
+                        + Padel
+                      </button>
+                      <button className="mutedBtn" type="button" onClick={() => addCourtBySport("tenis")}>
+                        + Tenis
+                      </button>
+                      <button className="mutedBtn" type="button" onClick={addCourt}>
+                        + Otra cancha
+                      </button>
+                    </div>
+
+                    <div className="courtCards">
+                    {courts.map((court, index) => (
+                      <article className="courtCard" key={`${court.name}-${index}`}>
+                        <div className="courtCardMeta">
+                          <strong>Cancha {index + 1}</strong>
+                          <span className="small">{formatCourtSport(court.sport)}</span>
+                        </div>
+                        <div className="formGrid">
+                        <input
+                          className="input"
+                          value={court.name}
+                          onChange={(e) => updateCourt(index, { name: e.target.value })}
+                          placeholder={`Cancha ${index + 1}`}
+                        />
+                        <select
+                          className="input"
+                          value={court.sport}
+                          onChange={(e) => updateCourt(index, { sport: e.target.value as CourtSport })}
+                        >
+                          <option value="futbol">Futbol</option>
+                          <option value="padel">Padel</option>
+                          <option value="tenis">Tenis</option>
+                          <option value="otro">Otro</option>
+                        </select>
+                        <div className="linkRow" style={{ marginTop: 0 }}>
+                          <input
+                            className="input"
+                            type="number"
+                            min={1}
+                            value={court.capacity}
+                            onChange={(e) => updateCourt(index, { capacity: Number(e.target.value || 1) })}
+                            placeholder="Capacidad cancha"
+                          />
+                          <button className="mutedBtn courtRemoveBtn" type="button" onClick={() => removeCourt(index)}>
+                            Quitar
+                          </button>
+                        </div>
+                        </div>
+                      </article>
+                    ))}
+                    </div>
+                  </section>
+                </>
+              ) : (
+                <div className="formGrid" style={{ marginTop: 8 }}>
+                  <input
+                    className="input"
+                    type="number"
+                    min={1}
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                    placeholder="Capacidad (personas/recursos)"
+                  />
+                  <div />
+                  <div />
+                </div>
+              )}
               <div className="formGrid" style={{ marginTop: 8 }}>
                 <div style={{ gridColumn: "1 / -1" }}>
                   <p className="small" style={{ marginBottom: 6 }}>Dias de atencion</p>

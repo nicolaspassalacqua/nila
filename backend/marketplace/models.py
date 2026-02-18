@@ -13,6 +13,7 @@ class Service(TenantOwnedModel):
     discipline = models.CharField(max_length=80)
     description = models.TextField(blank=True, default="")
     service_type = models.CharField(max_length=24, choices=ServiceType.choices, default=ServiceType.TURNO)
+    service_config = models.JSONField(default=dict, blank=True)
     duration_min = models.PositiveIntegerField(default=60)
     price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     capacity = models.PositiveIntegerField(default=1)

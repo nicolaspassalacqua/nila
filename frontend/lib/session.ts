@@ -13,11 +13,13 @@ export type AppSession = {
   token: string;
   tenantId: string;
   user?: UserProfile;
+  authMethod?: "password" | "google" | "facebook";
 };
 
 const TOKEN_KEY = "nila_token";
 const TENANT_KEY = "nila_tenant_id";
 const USER_KEY = "nila_user";
+const AUTH_METHOD_KEY = "nila_auth_method";
 const REMEMBER_KEY = "nila_remember";
 
 function readStorage(key: string): string {
@@ -39,7 +41,9 @@ export function getSession(): AppSession {
   const token = readStorage(TOKEN_KEY);
   const tenantId = readStorage(TENANT_KEY);
   const userRaw = readStorage(USER_KEY);
+  const authMethodRaw = readStorage(AUTH_METHOD_KEY);
   let user: UserProfile | undefined;
+  let authMethod: AppSession["authMethod"];
 
   if (userRaw) {
     try {
@@ -49,7 +53,11 @@ export function getSession(): AppSession {
     }
   }
 
-  return { token, tenantId, user };
+  if (authMethodRaw === "password" || authMethodRaw === "google" || authMethodRaw === "facebook") {
+    authMethod = authMethodRaw;
+  }
+
+  return { token, tenantId, user, authMethod };
 }
 
 export function saveSession(session: AppSession, remember = true): void {
@@ -63,11 +71,17 @@ export function saveSession(session: AppSession, remember = true): void {
   if (session.user) {
     target.setItem(USER_KEY, JSON.stringify(session.user));
   }
+  if (session.authMethod) {
+    target.setItem(AUTH_METHOD_KEY, session.authMethod);
+  } else {
+    target.removeItem(AUTH_METHOD_KEY);
+  }
   target.setItem(REMEMBER_KEY, remember ? "1" : "0");
 
   other.removeItem(TOKEN_KEY);
   other.removeItem(TENANT_KEY);
   other.removeItem(USER_KEY);
+  other.removeItem(AUTH_METHOD_KEY);
   other.removeItem(REMEMBER_KEY);
 }
 
@@ -82,5 +96,6 @@ export function clearSession(): void {
   clearBothStorages(TOKEN_KEY);
   clearBothStorages(TENANT_KEY);
   clearBothStorages(USER_KEY);
+  clearBothStorages(AUTH_METHOD_KEY);
   clearBothStorages(REMEMBER_KEY);
 }

@@ -1,9 +1,11 @@
-﻿from django.utils import timezone
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from booking.models import Appointment
+from core.models import TenantMembership
 from core.tenant_access import get_tenant_for_request
 from notifications.models import MessageTemplate, MessageQueue
 from notifications.serializers import MessageTemplateSerializer, MessageQueueSerializer
@@ -28,7 +30,23 @@ class MessageQueueViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         tenant = get_tenant_for_request(self.request)
-        return MessageQueue.objects.filter(tenant=tenant)
+        qs = MessageQueue.objects.filter(tenant=tenant)
+
+        is_professional = TenantMembership.objects.filter(
+            tenant=tenant,
+            user=self.request.user,
+            is_active=True,
+        ).exists()
+        if is_professional:
+            return qs
+
+        addresses = [f"user:{self.request.user.id}"]
+        if self.request.user.email:
+            addresses.append(self.request.user.email.strip())
+        if self.request.user.phone:
+            addresses.append(self.request.user.phone.strip())
+
+        return qs.filter(Q(to_address__in=addresses) | Q(payload__recipient_user_id=self.request.user.id))
 
     def perform_create(self, serializer):
         tenant = get_tenant_for_request(self.request)

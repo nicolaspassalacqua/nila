@@ -10,6 +10,18 @@ import { clearSession, getSession, UserProfile } from "@/lib/session";
 type Appointment = { id: number; service: number; client: number; start_dt: string; status: string };
 type Service = { id: number; name: string; discipline: string; price: string };
 type Waitlist = { id: number; service: number; desired_date: string; status: string };
+type MessageQueueItem = {
+  id: number;
+  status: string;
+  channel: string;
+  to_address: string;
+  payload: {
+    type?: string;
+    message?: string;
+    start_dt?: string;
+    [key: string]: any;
+  };
+};
 
 export default function ClientDashboardPage() {
   const router = useRouter();
@@ -20,6 +32,8 @@ export default function ClientDashboardPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [waitlists, setWaitlists] = useState<Waitlist[]>([]);
+  const [messages, setMessages] = useState<MessageQueueItem[]>([]);
+  const [inboxOpen, setInboxOpen] = useState(true);
   const [log, setLog] = useState("Listo");
 
   const nextAppointment = useMemo(() => {
@@ -54,6 +68,20 @@ export default function ClientDashboardPage() {
     });
   }, [nextAppointment]);
 
+  const queuedMessages = useMemo(
+    () => messages.filter((item) => item.status === "queued"),
+    [messages]
+  );
+
+  const previewMessageTypes = useMemo(() => {
+    const found = new Set<string>();
+    for (const item of queuedMessages) {
+      if (item.payload?.type) found.add(item.payload.type);
+      if (found.size >= 3) break;
+    }
+    return Array.from(found);
+  }, [queuedMessages]);
+
   useEffect(() => {
     const session = getSession();
     if (!session.token || !session.tenantId) {
@@ -81,14 +109,16 @@ export default function ClientDashboardPage() {
 
   async function refresh(activeToken = token, activeTenant = tenantId) {
     try {
-      const [s, a, w] = await Promise.all([
+      const [s, a, w, mq] = await Promise.all([
         apiRequest<Service[]>("/services", { token: activeToken, tenantId: activeTenant }),
         apiRequest<Appointment[]>("/appointments", { token: activeToken, tenantId: activeTenant }),
         apiRequest<Waitlist[]>("/waitlists", { token: activeToken, tenantId: activeTenant }),
+        apiRequest<MessageQueueItem[]>("/message-queue", { token: activeToken, tenantId: activeTenant }),
       ]);
       setServices(s);
       setAppointments(a);
       setWaitlists(w);
+      setMessages(mq);
       setLog("Datos actualizados");
     } catch (error: any) {
       setLog(`Error: ${error.message}`);
@@ -119,6 +149,22 @@ export default function ClientDashboardPage() {
     router.push("/login");
   }
 
+  async function markMessageSent(id: number) {
+    try {
+      await apiRequest(`/message-queue/${id}/mark-sent`, { method: "POST", token, tenantId });
+      await refresh();
+    } catch (error: any) {
+      setLog(`Error inbox: ${error.message}`);
+    }
+  }
+
+  function messageUi(type?: string): { icon: string; label: string; tone: "ok" | "danger" | "info" } {
+    if (type === "reservation_confirmed_client") return { icon: "OK", label: "Aceptada", tone: "ok" };
+    if (type === "reservation_cancelled_client") return { icon: "X", label: "Rechazada", tone: "danger" };
+    if (type === "reservation_requested_professional") return { icon: "N", label: "Nueva", tone: "info" };
+    return { icon: "i", label: "Info", tone: "info" };
+  }
+
   return (
     <main>
       <div className="brand">NILA</div>
@@ -134,7 +180,68 @@ export default function ClientDashboardPage() {
           <strong>{displayName}</strong>
         </div>
       </div>
-      <h1 className="sectionTitle">Dashboard Cliente</h1>
+      <div className="dashboardHeaderRow">
+        <h1 className="sectionTitle">Dashboard Cliente</h1>
+        <div className="inboxBellWrap">
+          <button className="inboxBellBtn" onClick={() => setInboxOpen((v) => !v)} aria-label="Abrir inbox cliente">
+            Inbox
+            {queuedMessages.length > 0 ? <span className="inboxBellCount">{queuedMessages.length}</span> : null}
+          </button>
+          {previewMessageTypes.length > 0 ? (
+            <div className="inboxPreviewRow">
+              {previewMessageTypes.map((type) => (
+                <span key={type} className={`messageTypeBadge ${messageUi(type).tone}`}>
+                  {messageUi(type).icon} {messageUi(type).label}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {inboxOpen ? (
+            <div className="inboxPopover">
+              <h3>Notificaciones</h3>
+              {queuedMessages.length === 0 ? (
+                <p className="small">No hay mensajes nuevos.</p>
+              ) : (
+                <ul className="list">
+                  {queuedMessages.slice(0, 8).map((item) => (
+                    <li key={item.id}>
+                      <span className={`messageTypeBadge ${messageUi(item.payload?.type).tone}`}>
+                        {messageUi(item.payload?.type).icon} {messageUi(item.payload?.type).label}
+                      </span>
+                      <strong>{item.payload?.message || item.payload?.type || "Mensaje"}</strong>
+                      <div className="small">
+                        {item.payload?.start_dt ? new Date(item.payload.start_dt).toLocaleString("es-AR") : ""}
+                      </div>
+                      <button className="mutedBtn" style={{ marginTop: 6 }} onClick={() => void markMessageSent(item.id)}>
+                        Marcar leido
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="card" style={{ marginTop: 12 }}>
+        <h2>Notificaciones</h2>
+        <p className="small">{queuedMessages.length} pendiente(s)</p>
+        {queuedMessages.length === 0 ? (
+          <p className="small">Sin novedades.</p>
+        ) : (
+          <div>
+            {queuedMessages.slice(0, 3).map((item) => (
+              <div key={`preview-${item.id}`} style={{ marginBottom: 8 }}>
+                <span className={`messageTypeBadge ${messageUi(item.payload?.type).tone}`}>
+                  {messageUi(item.payload?.type).icon} {messageUi(item.payload?.type).label}
+                </span>
+                <span style={{ marginLeft: 8 }}>{item.payload?.message || item.payload?.type || "Mensaje"}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid">
         <section className="card upcomingCard">

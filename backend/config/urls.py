@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from accounts.views import InternalProfessionalViewSet
 from booking.views import AppointmentViewSet
 from core.views import ArcaCuitBridgeView, CompanyCuitLookupView, CompanyProfileView, PlatformSettingViewSet, TenantMembershipViewSet, TenantRatingViewSet, TenantViewSet
 from crm.views import ClientViewSet
@@ -33,6 +34,7 @@ router.register(r"order-items", OrderItemViewSet, basename="order-item")
 router.register(r"payments", PaymentViewSet, basename="payment")
 router.register(r"cash-movements", CashMovementViewSet, basename="cash-movement")
 router.register(r"invoices", InvoiceViewSet, basename="invoice")
+router.register(r"internal-professionals", InternalProfessionalViewSet, basename="internal-professional")
 
 
 @api_view(["GET"])

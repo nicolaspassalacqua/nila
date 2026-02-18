@@ -19,7 +19,7 @@ export default function HomePage() {
           <h2>Profesional</h2>
           <p>Agenda, CRM, POS, multi-tenant y operaciones del negocio.</p>
           <div className="cardActions">
-            <Link className="linkBtn" href="/professional/dashboard">Dashboard profesional</Link>
+            <Link className="linkBtn" href="/professional">Modulos profesional</Link>
           </div>
         </section>
       </div>

@@ -23,3 +23,22 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "email", "full_name", "phone", "avatar_url", "is_staff", "is_active"]
+
+
+class InternalProfessionalSerializer(serializers.ModelSerializer):
+    tenant_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "full_name",
+            "phone",
+            "is_active",
+            "tenant_count",
+            "last_login",
+            "date_joined",
+        ]
+        read_only_fields = ["id", "tenant_count", "last_login", "date_joined"]

@@ -4,13 +4,15 @@ import urllib.parse
 import urllib.request
 
 from django.utils.text import slugify
-from rest_framework import generics, permissions, status
+from django.db.models import Count
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import User
-from accounts.serializers import RegisterSerializer, UserSerializer
+from accounts.serializers import InternalProfessionalSerializer, RegisterSerializer, UserSerializer
 from core.models import PlatformSetting, Tenant
 
 
@@ -223,3 +225,25 @@ class GoogleAuthConfigView(APIView):
                 "facebook_app_id": facebook_app_id if facebook_enabled else "",
             }
         )
+
+
+class InternalProfessionalViewSet(viewsets.ModelViewSet):
+    serializer_class = InternalProfessionalSerializer
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+    http_method_names = ["get", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        return (
+            User.objects.filter(
+                is_staff=False,
+                tenant_memberships__is_active=True,
+            )
+            .annotate(tenant_count=Count("tenant_memberships__tenant", distinct=True))
+            .distinct()
+            .order_by("username")
+        )
+
+    def perform_destroy(self, instance):
+        if instance.is_superuser or instance.is_staff:
+            raise PermissionDenied("No se permite eliminar usuarios administrativos.")
+        instance.delete()

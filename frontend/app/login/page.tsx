@@ -1,10 +1,11 @@
 ﻿"use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { apiRequest } from "@/lib/api";
 import { saveSession, UserProfile } from "@/lib/session";
+import { INTERNAL_ADMIN_HIDDEN_PATH } from "@/lib/internal-admin";
 
 type Tenant = { id: number; name: string; slug: string };
 
@@ -40,6 +41,7 @@ declare global {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -58,6 +60,8 @@ export default function LoginPage() {
   const [message, setMessage] = useState("Ingresa para usar la plataforma completa.");
   const [googleClientId, setGoogleClientId] = useState(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "");
   const [facebookAppId, setFacebookAppId] = useState(process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "");
+  const adminOnlyMode = searchParams.get("admin") === "1";
+  const nextPath = searchParams.get("next") || "";
   const googleEnabled = googleClientId.trim().length > 0;
   const facebookEnabled = facebookAppId.trim().length > 0;
   const actionLabel = useMemo(() => (mode === "login" ? "Acceder a mi espacio" : "Crear cuenta"), [mode]);
@@ -68,6 +72,13 @@ export default function LoginPage() {
   useEffect(() => {
     roleTargetRef.current = roleTarget;
   }, [roleTarget]);
+
+  useEffect(() => {
+    if (!adminOnlyMode) return;
+    setRoleTarget("professional");
+    setMode("login");
+    setMessage("Acceso interno: ingresa con usuario y contrasena de administrador.");
+  }, [adminOnlyMode]);
 
   useEffect(() => {
     setHeroImageSrc(heroRole === "client" ? "/images/login-client.png" : "/images/login-professional.png");
@@ -112,7 +123,7 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (!googleEnabled) return;
+    if (!googleEnabled || adminOnlyMode) return;
 
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
@@ -143,10 +154,10 @@ export default function LoginPage() {
     return () => {
       script.remove();
     };
-  }, [googleClientId, googleEnabled]);
+  }, [googleClientId, googleEnabled, adminOnlyMode]);
 
   useEffect(() => {
-    if (!facebookEnabled) return;
+    if (!facebookEnabled || adminOnlyMode) return;
 
     window.fbAsyncInit = () => {
       if (!window.FB) return;
@@ -175,14 +186,20 @@ export default function LoginPage() {
     return () => {
       delete window.fbAsyncInit;
     };
-  }, [facebookAppId, facebookEnabled]);
+  }, [facebookAppId, facebookEnabled, adminOnlyMode]);
 
   function routeByRole(
     targetRole: "client" | "professional" = roleTargetRef.current,
     hasTenant = true
   ) {
+    if (adminOnlyMode) {
+      const resolvedNext =
+        nextPath && nextPath.startsWith("/internal/") ? nextPath : INTERNAL_ADMIN_HIDDEN_PATH;
+      router.push(resolvedNext);
+      return;
+    }
     if (targetRole === "professional") {
-      router.push(hasTenant ? "/professional/dashboard" : "/professional/tenants");
+      router.push(hasTenant ? "/professional" : "/professional/tenants");
       return;
     }
     router.push("/client/dashboard");
@@ -225,6 +242,10 @@ export default function LoginPage() {
       apiRequest<Tenant[]>("/tenants", { token: accessToken }),
     ]);
 
+    if (adminOnlyMode && !user.is_staff) {
+      throw new Error("Acceso denegado: se requiere usuario administrador.");
+    }
+
     const defaultTenant = tenants.find((t) => t.slug === "demo-center") || tenants[0];
     if (!defaultTenant) {
       if (targetRole === "professional") {
@@ -233,6 +254,7 @@ export default function LoginPage() {
             token: accessToken,
             tenantId: "",
             user,
+            authMethod: "password",
           },
           rememberMe
         );
@@ -249,6 +271,7 @@ export default function LoginPage() {
         token: accessToken,
         tenantId: String(defaultTenant.id),
         user,
+        authMethod: "password",
       },
       rememberMe
     );
@@ -259,6 +282,10 @@ export default function LoginPage() {
   }
 
   async function handleGoogleAuth(idToken: string) {
+    if (adminOnlyMode) {
+      setMessage("En administracion interna solo se permite usuario y contrasena.");
+      return;
+    }
     const targetRole = roleTargetRef.current;
     setLoading(true);
     setMessage("Autenticando con Google...");
@@ -274,6 +301,7 @@ export default function LoginPage() {
           token: data.access,
           tenantId: data.tenant_id ? String(data.tenant_id) : "",
           user: data.user,
+          authMethod: "google",
         },
         rememberMe
       );
@@ -294,6 +322,10 @@ export default function LoginPage() {
   }
 
   async function handleFacebookAuth(accessToken: string) {
+    if (adminOnlyMode) {
+      setMessage("En administracion interna solo se permite usuario y contrasena.");
+      return;
+    }
     const targetRole = roleTargetRef.current;
     setLoading(true);
     setMessage("Autenticando con Facebook...");
@@ -309,6 +341,7 @@ export default function LoginPage() {
           token: data.access,
           tenantId: data.tenant_id ? String(data.tenant_id) : "",
           user: data.user,
+          authMethod: "facebook",
         },
         rememberMe
       );
@@ -329,6 +362,10 @@ export default function LoginPage() {
   }
 
   function startFacebookLogin() {
+    if (adminOnlyMode) {
+      setMessage("En administracion interna solo se permite usuario y contrasena.");
+      return;
+    }
     if (!facebookEnabled) {
       setMessage("Facebook no configurado.");
       return;
@@ -408,37 +445,41 @@ export default function LoginPage() {
           <span className="badge">NILA Platform</span>
         </div>
         <p className="small">
-          {mode === "login"
-            ? "Inicia sesion para entrar a tu espacio de trabajo."
-            : "Crea tu cuenta para comenzar a operar en la plataforma."}
+          {adminOnlyMode
+            ? "Acceso restringido a administradores de plataforma."
+            : mode === "login"
+              ? "Inicia sesion para entrar a tu espacio de trabajo."
+              : "Crea tu cuenta para comenzar a operar en la plataforma."}
         </p>
 
-        <div className="portalSwitch" role="tablist" aria-label="Seleccionar portal">
-          <button
-            className={`portalCard ${roleTarget === "client" ? "active" : ""}`}
-            type="button"
-            onClick={() => setRoleTarget("client")}
-            aria-selected={roleTarget === "client"}
-          >
-            <span className="portalTitleRow">
-              <span className="portalIcon" aria-hidden="true">C</span>
-              <span className="portalTitle">Portal Cliente</span>
-            </span>
-            <span className="portalDesc">Reservas, agenda y seguimiento.</span>
-          </button>
-          <button
-            className={`portalCard ${roleTarget === "professional" ? "active" : ""}`}
-            type="button"
-            onClick={() => setRoleTarget("professional")}
-            aria-selected={roleTarget === "professional"}
-          >
-            <span className="portalTitleRow">
-              <span className="portalIcon" aria-hidden="true">P</span>
-              <span className="portalTitle">Portal Profesional</span>
-            </span>
-            <span className="portalDesc">Agenda, CRM, POS y operaciones.</span>
-          </button>
-        </div>
+        {adminOnlyMode ? null : (
+          <div className="portalSwitch" role="tablist" aria-label="Seleccionar portal">
+            <button
+              className={`portalCard ${roleTarget === "client" ? "active" : ""}`}
+              type="button"
+              onClick={() => setRoleTarget("client")}
+              aria-selected={roleTarget === "client"}
+            >
+              <span className="portalTitleRow">
+                <span className="portalIcon" aria-hidden="true">C</span>
+                <span className="portalTitle">Portal Cliente</span>
+              </span>
+              <span className="portalDesc">Reservas, agenda y seguimiento.</span>
+            </button>
+            <button
+              className={`portalCard ${roleTarget === "professional" ? "active" : ""}`}
+              type="button"
+              onClick={() => setRoleTarget("professional")}
+              aria-selected={roleTarget === "professional"}
+            >
+              <span className="portalTitleRow">
+                <span className="portalIcon" aria-hidden="true">P</span>
+                <span className="portalTitle">Portal Profesional</span>
+              </span>
+              <span className="portalDesc">Agenda, CRM, POS y operaciones.</span>
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="loginForm">
           <div className="formGrid formGridTwo">
@@ -496,44 +537,50 @@ export default function LoginPage() {
             <button className="linkBtn actionBtn" type="submit" disabled={loading}>{loading ? "Procesando..." : actionLabel}</button>
           </div>
 
-          <div className="authInlineSwitch">
-            {mode === "login" ? (
-              <>
-                <span className="small">No tienes cuenta?</span>
-                <button className="textBtn" type="button" onClick={() => switchMode("register")}>Crear una cuenta</button>
-              </>
-            ) : (
-              <>
-                <span className="small">Ya tienes cuenta?</span>
-                <button className="textBtn" type="button" onClick={() => switchMode("login")}>Iniciar sesion</button>
-              </>
-            )}
-          </div>
+          {adminOnlyMode ? null : (
+            <div className="authInlineSwitch">
+              {mode === "login" ? (
+                <>
+                  <span className="small">No tienes cuenta?</span>
+                  <button className="textBtn" type="button" onClick={() => switchMode("register")}>Crear una cuenta</button>
+                </>
+              ) : (
+                <>
+                  <span className="small">Ya tienes cuenta?</span>
+                  <button className="textBtn" type="button" onClick={() => switchMode("login")}>Iniciar sesion</button>
+                </>
+              )}
+            </div>
+          )}
         </form>
 
-        <div className="loginDivider"><span>O ingresa de forma rapida con</span></div>
+        {adminOnlyMode ? null : (
+          <>
+            <div className="loginDivider"><span>O ingresa de forma rapida con</span></div>
 
-        <div className="googleWrap">
-          {googleEnabled ? (
-            <div ref={googleButtonRef} />
-          ) : (
-            <button className="mutedBtn" type="button" disabled>Google no configurado</button>
-          )}
+            <div className="googleWrap">
+              {googleEnabled ? (
+                <div ref={googleButtonRef} />
+              ) : (
+                <button className="mutedBtn" type="button" disabled>Google no configurado</button>
+              )}
 
-          {facebookEnabled ? (
-            <button className="facebookBtn" type="button" onClick={startFacebookLogin} disabled={loading}>
-              Continuar con Facebook
-            </button>
-          ) : (
-            <button className="mutedBtn" type="button" disabled>Facebook no configurado</button>
-          )}
+              {facebookEnabled ? (
+                <button className="facebookBtn" type="button" onClick={startFacebookLogin} disabled={loading}>
+                  Continuar con Facebook
+                </button>
+              ) : (
+                <button className="mutedBtn" type="button" disabled>Facebook no configurado</button>
+              )}
 
-          <p className="small">
-            {googleEnabled || facebookEnabled
-              ? "Accede de forma rapida con tu cuenta social."
-              : "Pronto sumaremos mas metodos de acceso."}
-          </p>
-        </div>
+              <p className="small">
+                {googleEnabled || facebookEnabled
+                  ? "Accede de forma rapida con tu cuenta social."
+                  : "Pronto sumaremos mas metodos de acceso."}
+              </p>
+            </div>
+          </>
+        )}
 
         <pre className="pre">{message}</pre>
       </section>

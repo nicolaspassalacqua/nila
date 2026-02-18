@@ -5,19 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { apiRequest } from "@/lib/api";
-import { clearSession, getSession, UserProfile } from "@/lib/session";
-
-type Client = {
-  id: number;
-  full_name: string;
-  email?: string;
-  phone?: string;
-};
-
-type ServiceSlot = {
-  start_iso: string;
-  label: string;
-};
+import { clearSession, getSession } from "@/lib/session";
 
 type DiscoveredService = {
   id: number;
@@ -26,13 +14,15 @@ type DiscoveredService = {
   description: string;
   price: string;
   duration_min: number;
-  is_online: boolean;
-  available_slots: ServiceSlot[];
 };
 
 type EstablishmentResult = {
   tenant_id: number;
   tenant_name: string;
+  tenant_photo_url: string;
+  tenant_address: string;
+  tenant_description: string;
+  tenant_opening_hours: string;
   rating_avg: number;
   rating_count: number;
   services: DiscoveredService[];
@@ -50,14 +40,9 @@ function formatStars(avg: number): string {
 export default function ClientMarketplacePage() {
   const router = useRouter();
   const [token, setToken] = useState("");
-  const [user, setUser] = useState<UserProfile | null>(null);
-
   const [query, setQuery] = useState("");
   const [selectedDiscipline, setSelectedDiscipline] = useState("Todas");
   const [establishments, setEstablishments] = useState<EstablishmentResult[]>([]);
-  const [selectedEstablishmentId, setSelectedEstablishmentId] = useState<number | null>(null);
-  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
-  const [selectedSlotIso, setSelectedSlotIso] = useState("");
   const [log, setLog] = useState("Listo");
 
   const disciplines = useMemo(() => {
@@ -67,22 +52,6 @@ export default function ClientMarketplacePage() {
     return ["Todas", ...values];
   }, [establishments]);
 
-  const selectedEstablishment = useMemo(() => {
-    if (!selectedEstablishmentId) return null;
-    return establishments.find((item) => item.tenant_id === selectedEstablishmentId) || null;
-  }, [selectedEstablishmentId, establishments]);
-
-  const servicesForEstablishment = useMemo(() => {
-    if (!selectedEstablishment) return [];
-    if (selectedDiscipline === "Todas") return selectedEstablishment.services;
-    return selectedEstablishment.services.filter((service) => service.discipline === selectedDiscipline);
-  }, [selectedDiscipline, selectedEstablishment]);
-
-  const selectedService = useMemo(() => {
-    if (!selectedServiceId) return null;
-    return servicesForEstablishment.find((service) => service.id === selectedServiceId) || null;
-  }, [selectedServiceId, servicesForEstablishment]);
-
   useEffect(() => {
     const session = getSession();
     if (!session.token) {
@@ -90,7 +59,6 @@ export default function ClientMarketplacePage() {
       return;
     }
     setToken(session.token);
-    setUser(session.user || null);
   }, [router]);
 
   useEffect(() => {
@@ -100,23 +68,6 @@ export default function ClientMarketplacePage() {
     }, 220);
     return () => clearTimeout(timeout);
   }, [token, query, selectedDiscipline]);
-
-  useEffect(() => {
-    if (!selectedEstablishment) return;
-    const service = selectedEstablishment.services.find((item) => item.id === selectedServiceId) || selectedEstablishment.services[0] || null;
-    setSelectedServiceId(service ? service.id : null);
-    setSelectedSlotIso(service?.available_slots?.[0]?.start_iso || "");
-  }, [selectedEstablishment]);
-
-  function toggleEstablishment(tenantId: number) {
-    if (selectedEstablishmentId === tenantId) {
-      setSelectedEstablishmentId(null);
-      setSelectedServiceId(null);
-      setSelectedSlotIso("");
-      return;
-    }
-    setSelectedEstablishmentId(tenantId);
-  }
 
   async function refreshDiscovery(activeToken = token) {
     try {
@@ -131,24 +82,12 @@ export default function ClientMarketplacePage() {
 
       setEstablishments(data.establishments);
       if (data.establishments.length === 0) {
-        setSelectedEstablishmentId(null);
-        setSelectedServiceId(null);
-        setSelectedSlotIso("");
         setLog("No encontramos establecimientos para esa busqueda.");
         return;
       }
-
-      const establishment =
-        data.establishments.find((item) => item.tenant_id === selectedEstablishmentId) || data.establishments[0];
-      setSelectedEstablishmentId(establishment.tenant_id);
-
-      const service =
-        establishment.services.find((item) => item.id === selectedServiceId) || establishment.services[0] || null;
-      setSelectedServiceId(service ? service.id : null);
-      setSelectedSlotIso(service?.available_slots?.[0]?.start_iso || "");
-      setLog("Establecimientos y servicios actualizados.");
+      setLog("Establecimientos actualizados.");
     } catch (error: any) {
-      setLog(`Error buscando servicios: ${error.message}`);
+      setLog(`Error buscando establecimientos: ${error.message}`);
     }
   }
 
@@ -162,20 +101,19 @@ export default function ClientMarketplacePage() {
       <div className="brand">NILA</div>
       <div className="brandTag">Strategy | Technology | Execution</div>
       <h1 className="sectionTitle">Marketplace</h1>
-      <p className="small">Busca por servicio, elige establecimiento y agenda en pocos pasos.</p>
+      <p className="small">Elige establecimiento y luego reserva en la pantalla de servicios.</p>
 
       <section className="card">
-        <h2>Buscar servicio</h2>
+        <h2>Buscar establecimiento</h2>
         <div className="marketTopBar">
           <input
             className="input"
-            placeholder="Ej: Pilates, depilacion laser, kinesiologia..."
+            placeholder="Ej: futbol, padel, pilates..."
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
           <button className="linkBtn" onClick={() => refreshDiscovery()}>Buscar</button>
         </div>
-
         <div className="chipRow">
           {disciplines.map((discipline) => (
             <button
@@ -190,78 +128,39 @@ export default function ClientMarketplacePage() {
       </section>
 
       <section className="card" style={{ marginTop: 12 }}>
-        <h2>1. Elegi establecimiento</h2>
+        <h2>Establecimientos</h2>
         <div className="serviceGrid">
           {establishments.map((item) => {
-            const active = item.tenant_id === selectedEstablishmentId;
-            const visibleServices =
-              selectedDiscipline === "Todas"
-                ? item.services
-                : item.services.filter((service) => service.discipline === selectedDiscipline);
+            const serviceSummary = item.services.slice(0, 4).map((service) => service.name).join(", ");
             return (
-              <section key={item.tenant_id} className={active ? "card serviceCard selected" : "card serviceCard"}>
+              <article key={item.tenant_id} className="card serviceCard">
+                <div className="featuredGrid" style={{ gridTemplateColumns: "1fr", marginTop: 0 }}>
+                  <div className="featuredCard" style={{ cursor: "default", padding: 0, overflow: "hidden" }}>
+                    {item.tenant_photo_url ? (
+                      <img
+                        src={item.tenant_photo_url}
+                        alt={item.tenant_name}
+                        style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }}
+                      />
+                    ) : (
+                      <div style={{ height: 120, background: "linear-gradient(145deg, #eaf2ff 0%, #d9e6fb 100%)" }} />
+                    )}
+                  </div>
+                </div>
                 <div className="serviceTitleRow">
                   <h2>{item.tenant_name}</h2>
                   <span className="badge">{formatStars(item.rating_avg)}</span>
                 </div>
-                <p className="small">
-                  {item.rating_count > 0
-                    ? `${item.rating_count} valoraciones de usuarios`
-                    : "Aun sin valoraciones"}
-                </p>
-                <p className="small">{item.services.length} servicios disponibles para tu busqueda.</p>
-                <div className="cardActions">
-                  <button className={active ? "linkBtn" : "mutedBtn"} onClick={() => toggleEstablishment(item.tenant_id)}>
-                    {active ? "Ocultar servicios" : "Ver servicios"}
-                  </button>
+                <p className="small">{item.tenant_address || "Direccion no informada"}</p>
+                <p className="small">{item.tenant_description || "Sin descripcion del establecimiento."}</p>
+                <p className="small"><strong>Servicios:</strong> {serviceSummary || "Sin servicios activos"}</p>
+                <p className="small">Horario: {item.tenant_opening_hours || "No informado"}</p>
+                <div className="linkRow">
+                  <Link className="linkBtn" href={`/client/marketplace/${item.tenant_id}`}>
+                    Ver servicios y reservar
+                  </Link>
                 </div>
-
-                {active ? (
-                  <div style={{ marginTop: 10 }}>
-                    {visibleServices.length === 0 ? (
-                      <p className="small">No hay servicios para este filtro.</p>
-                    ) : (
-                      <div className="serviceGrid">
-                        {visibleServices.map((service) => {
-                          const isSelected = service.id === selectedServiceId;
-                          return (
-                            <section key={service.id} className={isSelected ? "card serviceCard selected" : "card serviceCard"}>
-                              <div className="serviceTitleRow">
-                                <h2>{service.name}</h2>
-                                <span className="badge">{service.discipline}</span>
-                              </div>
-                              <p className="small">{service.description || "Servicio profesional personalizado."}</p>
-                              <div className="serviceMeta">
-                                <span>ARS {Number(service.price).toLocaleString("es-AR")}</span>
-                                <span>{service.duration_min} min</span>
-                                <span>{service.is_online ? "Online" : "Presencial"}</span>
-                              </div>
-
-                              <div className="chipRow">
-                                {service.available_slots.map((slot) => {
-                                  const activeSlot = isSelected && selectedSlotIso === slot.start_iso;
-                                  return (
-                                    <button
-                                      key={slot.start_iso}
-                                      className={activeSlot ? "chip active" : "chip"}
-                                      onClick={() => {
-                                        setSelectedServiceId(service.id);
-                                        setSelectedSlotIso(slot.start_iso);
-                                      }}
-                                    >
-                                      {slot.label}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </section>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </section>
+              </article>
             );
           })}
         </div>
