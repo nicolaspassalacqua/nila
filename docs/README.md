@@ -1,26 +1,33 @@
 ﻿# Documentacion NILA
 
-Este directorio concentra la documentacion viva del producto y del MVP.
+Indice de documentacion del proyecto.
 
-## Indice principal
-- `manual-instalacion.md`: instalacion local y con Docker.
-- `manual-desarrollador.md`: guia para desarrolladores (backend/frontend/flujo).
-- `documento-tecnico.md`: especificacion tecnica del MVP (modulos, API, datos, seguridad).
-- `arquitectura.md`: arquitectura funcional y tecnica, decisiones y escalabilidad.`r`n- `arquitectura-conexion-logica.md`: diagramas graficos de conexion logica entre componentes.
-- `manual-usuario.md`: manual funcional para usuario cliente y profesional.
-- `registro-cambios.md`: bitacora de cambios de documentacion y producto.
-- `mvp-inicio.md`: alcance inicial del MVP.
-- `mvp-runbook.md`: pasos rapidos de validacion del MVP.
+## Documentos principales
+- [Documento tecnico FRD + NFR](./documento-tecnico.md)
+- [Manual de desarrollador](./manual-desarrollador.md)
+- [Manual de usuario](./manual-usuario.md)
+- [Manual tecnico](./manual-tecnico.md)
+- [Manual de instalacion](./manual-instalacion.md)
+- [Manual de AWS](./manual-aws.md)
+- [Manual de arquitectura](./arquitectura.md)
+- [Referencia de codigo](./referencia-codigo.md)
+- [Guia de despliegue EC2 (resumen operativo)](./deploy-ec2.md)
 
-## Regla de mantenimiento (obligatoria)
-Cada vez que se agregue, cambie o elimine funcionalidad:
-1. Actualizar `documento-tecnico.md` (modulo/API/modelo afectado).
-2. Actualizar `manual-usuario.md` si cambia experiencia de uso.
-3. Actualizar `manual-desarrollador.md` si cambia flujo de trabajo.
-4. Agregar entrada en `registro-cambios.md` con fecha y alcance.
+## Cobertura
+- Requerimientos funcionales y no funcionales.
+- Arquitectura modular backend (tipo addon/Odoo-like).
+- Operacion multi-portal (admin, owner, student, publico).
+- Integraciones: SSO, MercadoPago, ARCA (simulada), mapa/geolocalizacion.
+- Instalacion local y despliegue en AWS.
 
-## Convencion de versionado documental
-- Estado actual: `MVP 1.0-alpha`.
-- Version de docs: `docs-v1`.
-- Formato de entradas en registro: `YYYY-MM-DD | area | resumen | archivo(s)`.
+## Convencion de versionado
+- Se recomienda mantener en cada documento:
+  - Version
+  - Fecha de ultima actualizacion
+  - Responsable
 
+## Regla de actualizacion
+Cada cambio funcional relevante debe actualizar:
+1. `documento-tecnico.md`
+2. El manual especifico impactado (usuario, tecnico, instalacion, etc.)
+3. Este indice si se agrega o elimina documentacion
