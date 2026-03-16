@@ -10,13 +10,14 @@ const DEFAULT_API_URL =
   typeof window !== "undefined"
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : "http://localhost:8000";
-const API_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+const RUNTIME_CONFIG = typeof window !== "undefined" ? window.__APP_CONFIG__ || {} : {};
+const API_URL = RUNTIME_CONFIG.API_URL || import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 const LOGIN_COVER_IMAGE = import.meta.env.VITE_LOGIN_COVER_IMAGE || "/cover-login.jpg";
 const BRAND_LOGO_DARK = `${import.meta.env.BASE_URL}nila-logo-navy.svg`;
 const BRAND_LOGO_LIGHT = `${import.meta.env.BASE_URL}nila-logo-light.svg`;
 const BRAND_MARK = `${import.meta.env.BASE_URL}nila-mark.svg`;
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-const FACEBOOK_APP_ID = import.meta.env.VITE_FACEBOOK_APP_ID || "";
+const GOOGLE_CLIENT_ID = RUNTIME_CONFIG.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+const FACEBOOK_APP_ID = RUNTIME_CONFIG.FACEBOOK_APP_ID || import.meta.env.VITE_FACEBOOK_APP_ID || "";
 const PATH_LOGIN = "/login";
 const PATH_LOGIN_COMPANY = "/login-empresa";
 const PATH_LOGIN_STUDENT = "/login-alumno";
