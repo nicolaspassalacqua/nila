@@ -9,6 +9,7 @@ Indice de documentacion del proyecto.
 - [Manual tecnico](./manual-tecnico.md)
 - [Manual de instalacion](./manual-instalacion.md)
 - [Manual de AWS](./manual-aws.md)
+- [GitHub Actions + AWS (ECR + EC2)](./github-actions-aws.md)
 - [Manual de arquitectura](./arquitectura.md)
 - [Referencia de codigo](./referencia-codigo.md)
 - [Guia de despliegue EC2 (resumen operativo)](./deploy-ec2.md)

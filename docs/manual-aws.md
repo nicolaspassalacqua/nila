@@ -48,6 +48,12 @@ Variables criticas en `.env.ec2`:
 - `ALLOWED_HOSTS`
 - `ECR_REGISTRY`
 
+Admin por defecto en deploy:
+- Usuario: `admin`
+- Email: `admin@nila.local`
+- Password por defecto: `admin1234`
+- Si queres otro valor, sobreescribe `ADMIN_USERNAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` en `.env.ec2`.
+
 ## 6. Despliegue en EC2
 En la instancia:
 ```bash
@@ -94,3 +100,11 @@ MVP con EC2 + Compose es costo-efectivo y rapido.
 Evolucion recomendada:
 - ECS/Fargate para escalado y operacion administrada.
 - RDS + ElastiCache + ALB para arquitectura productiva.
+
+## 12. CI/CD con GitHub
+El repositorio incluye workflow para sincronizar GitHub con AWS:
+- Build/push a ECR
+- Deploy automatico en EC2
+
+Documento de setup:
+- `docs/github-actions-aws.md`
