@@ -423,6 +423,44 @@ function BrandLogo({ variant = "dark", className = "", alt = "NILA" }) {
   const src = variant === "light" ? BRAND_LOGO_LIGHT : BRAND_LOGO_DARK;
   return <img className={`brand-logo ${className}`.trim()} src={src} alt={alt} />;
 }
+
+function GoogleBrandIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M21.8 12.23c0-.73-.07-1.43-.18-2.1H12v3.97h5.5a4.7 4.7 0 0 1-2.04 3.08v2.56h3.3c1.93-1.77 3.04-4.38 3.04-7.5Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 22c2.76 0 5.08-.91 6.77-2.46l-3.3-2.56c-.91.61-2.08.98-3.47.98-2.66 0-4.92-1.8-5.73-4.22H2.86v2.65A10.22 10.22 0 0 0 12 22Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.27 13.74A6.13 6.13 0 0 1 5.95 12c0-.6.11-1.18.32-1.74V7.61H2.86A10.21 10.21 0 0 0 1.8 12c0 1.64.39 3.2 1.06 4.39l3.41-2.65Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 6.04c1.5 0 2.84.52 3.9 1.53l2.92-2.92C17.07 2.97 14.75 2 12 2a10.22 10.22 0 0 0-9.14 5.61l3.41 2.65c.81-2.42 3.07-4.22 5.73-4.22Z"
+      />
+    </svg>
+  );
+}
+
+function FacebookBrandIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#1877F2"
+        d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.03 4.39 11.03 10.13 11.93v-8.44H7.08v-3.49h3.05V9.41c0-3.03 1.79-4.7 4.53-4.7 1.31 0 2.69.24 2.69.24v2.98h-1.52c-1.5 0-1.97.93-1.97 1.89v2.25h3.35l-.54 3.49h-2.81V24C19.61 23.1 24 18.1 24 12.07Z"
+      />
+      <path
+        fill="#fff"
+        d="m16.67 15.56.54-3.49h-3.35V9.82c0-.96.47-1.89 1.97-1.89h1.52V4.95s-1.38-.24-2.69-.24c-2.74 0-4.53 1.67-4.53 4.7v2.66H7.08v3.49h3.05V24a12.1 12.1 0 0 0 3.73 0v-8.44h2.81Z"
+      />
+    </svg>
+  );
+}
 const HELP_MENU_CONTENT = {
   login: {
     title: "Ayuda de acceso",
@@ -1207,6 +1245,10 @@ function App() {
   const [adminPortalTab, setAdminPortalTab] = useState("accesos");
   const [companyConfigTab, setCompanyConfigTab] = useState("general");
   const [pendingBranchSetup, setPendingBranchSetup] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 820px)").matches : false
+  );
+  const [publicNavOpen, setPublicNavOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [loginPortalType, setLoginPortalType] = useState("company");
   const [loginTab, setLoginTab] = useState("signin");
@@ -1266,6 +1308,35 @@ function App() {
   );
   const effectiveGoogleClientId = publicAuthConfig.google_client_id || getGoogleClientId();
   const effectiveFacebookAppId = publicAuthConfig.facebook_app_id || getFacebookAppId();
+  const activeSocialProviders = useMemo(
+    () =>
+      [
+        publicAuthConfig.allow_google_sso && effectiveGoogleClientId
+          ? {
+              key: "google",
+              label: "Google",
+              signInLabel: "Continuar con Google",
+              signUpLabel: "Crear con Google",
+              icon: <GoogleBrandIcon />,
+            }
+          : null,
+        publicAuthConfig.allow_facebook_sso && effectiveFacebookAppId
+          ? {
+              key: "facebook",
+              label: "Facebook",
+              signInLabel: "Continuar con Facebook",
+              signUpLabel: "Crear con Facebook",
+              icon: <FacebookBrandIcon />,
+            }
+          : null,
+      ].filter(Boolean),
+    [
+      publicAuthConfig.allow_facebook_sso,
+      publicAuthConfig.allow_google_sso,
+      effectiveFacebookAppId,
+      effectiveGoogleClientId,
+    ]
+  );
   const isStudentLoginPortal = loginPortalType === "student";
   const isCompanyLoginPortal = loginPortalType === "company";
   const isAdminLoginPortal = loginPortalType === "admin";
@@ -1294,8 +1365,32 @@ function App() {
     : isAdminLoginPortal
       ? "Gestiona configuraciones, usuarios y suscripciones desde un unico lugar."
       : loginTab === "signup"
-        ? "Activa tu plan inicial con Google, Facebook o email, y luego completa la configuracion del estudio."
+      ? "Activa tu plan inicial con Google, Facebook o email, y luego completa la configuracion del estudio."
         : "Gestiona clases, alumnos y sucursales desde un solo lugar.";
+  const renderLoginSsoButtons = ({ mode = "signin", requirePlan = false } = {}) =>
+    activeSocialProviders.length ? (
+      <div className="login-sso-block">
+        <div className={`login-sso-actions ${activeSocialProviders.length === 1 ? "single-provider" : ""}`}>
+          {activeSocialProviders.map((provider) => (
+            <button
+              key={`${mode}-${provider.key}`}
+              type="button"
+              className={`sso-brand-btn ${provider.key}`}
+              onClick={() => loginWithSSO(provider.key)}
+              disabled={requirePlan && !selectedCompanyPlan}
+            >
+              <span className="sso-brand-icon">{provider.icon}</span>
+              <span>{mode === "signup" ? provider.signUpLabel : provider.signInLabel}</span>
+            </button>
+          ))}
+        </div>
+        <small className="login-config-hint">
+          {mode === "signup"
+            ? "Usa un acceso verificado y activa tu cuenta inicial en menos pasos."
+            : "Ingresa con un acceso social habilitado para esta plataforma."}
+        </small>
+      </div>
+    ) : null;
   const marketplaceCenters = useMemo(() => {
     const entries = [];
     const organizations = Array.isArray(marketplaceOrganizations) ? marketplaceOrganizations : [];
@@ -4105,6 +4200,18 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 820px)");
+    const syncViewport = (event) => setIsMobileViewport(event.matches);
+    setIsMobileViewport(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", syncViewport);
+      return () => mediaQuery.removeEventListener("change", syncViewport);
+    }
+    mediaQuery.addListener(syncViewport);
+    return () => mediaQuery.removeListener(syncViewport);
+  }, []);
+
+  useEffect(() => {
     if (normalizePath(pathname) !== PATH_DISCOVER_ALIAS) return;
     navigate(PATH_DISCOVER, true);
   }, [pathname]);
@@ -4131,6 +4238,17 @@ function App() {
   useEffect(() => {
     setHelpOpen(false);
   }, [pathname, ownerModule]);
+
+  useEffect(() => {
+    if (!isMobileViewport && publicNavOpen) {
+      setPublicNavOpen(false);
+    }
+  }, [isMobileViewport, publicNavOpen]);
+
+  useEffect(() => {
+    if (!publicNavOpen) return;
+    setPublicNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const onAccessibilityShortcut = (event) => {
@@ -4280,47 +4398,77 @@ function App() {
     return [];
   }
 
+  const runPublicHeaderAction = (action) => () => {
+    setPublicNavOpen(false);
+    action();
+  };
+
   const renderPublicHeader = (activeKey = "") => (
     <header className="landing-menu-shell">
       <div className="landing-menu-primary">
         <div className="landing-brand">
           <BrandLogo className="landing-brand-logo" />
         </div>
-        <nav className="landing-nav-links" aria-label="Navegacion principal">
-          <button
-            type="button"
-            className={`landing-nav-link ${activeKey === "about" ? "active" : ""}`}
-            onClick={openAbout}
-          >
-            Quienes somos
-          </button>
-          <button
-            type="button"
-            className={`landing-nav-link ${activeKey === "pricing" ? "active" : ""}`}
-            onClick={openPricing}
-          >
-            Precios y planes
-          </button>
-          <button type="button" className="landing-nav-link" onClick={openCompanyLogin}>
-            Ingreso empresas
-          </button>
-          <button type="button" className="landing-nav-link" onClick={openAdminLogin}>
-            Ingreso admin
-          </button>
-          <button type="button" className="landing-nav-link" onClick={openStudentLogin}>
-            Ingreso alumnos
-          </button>
-          <button
-            type="button"
-            className={`landing-nav-link ${activeKey === "discover" ? "active" : ""}`}
-            onClick={openFindCenter}
-          >
-            Buscar tu centro mas cercano
-          </button>
-        </nav>
-        <button type="button" className="landing-cta-btn" onClick={openCompanyLogin}>
-          Ingresar
-        </button>
+        <div className={`landing-nav-shell ${!isMobileViewport || publicNavOpen ? "open" : ""}`}>
+          <nav className="landing-nav-links" id="landing-nav-links" aria-label="Navegacion principal">
+            <button
+              type="button"
+              className={`landing-nav-link ${activeKey === "about" ? "active" : ""}`}
+              onClick={runPublicHeaderAction(openAbout)}
+            >
+              Quienes somos
+            </button>
+            <button
+              type="button"
+              className={`landing-nav-link ${activeKey === "pricing" ? "active" : ""}`}
+              onClick={runPublicHeaderAction(openPricing)}
+            >
+              Precios y planes
+            </button>
+            <button type="button" className="landing-nav-link" onClick={runPublicHeaderAction(openCompanyLogin)}>
+              Ingreso empresas
+            </button>
+            <button type="button" className="landing-nav-link" onClick={runPublicHeaderAction(openAdminLogin)}>
+              Ingreso admin
+            </button>
+            <button type="button" className="landing-nav-link" onClick={runPublicHeaderAction(openStudentLogin)}>
+              Ingreso alumnos
+            </button>
+            <button
+              type="button"
+              className={`landing-nav-link ${activeKey === "discover" ? "active" : ""}`}
+              onClick={runPublicHeaderAction(openFindCenter)}
+            >
+              Buscar tu centro mas cercano
+            </button>
+          </nav>
+          {isMobileViewport ? (
+            <button type="button" className="landing-cta-btn landing-cta-btn-mobile" onClick={runPublicHeaderAction(openCompanyLogin)}>
+              Ingresar
+            </button>
+          ) : null}
+        </div>
+        <div className="landing-menu-actions">
+          {!isMobileViewport ? (
+            <button type="button" className="landing-cta-btn" onClick={runPublicHeaderAction(openCompanyLogin)}>
+              Ingresar
+            </button>
+          ) : null}
+          {isMobileViewport ? (
+            <button
+              type="button"
+              className={`landing-menu-toggle ${publicNavOpen ? "active" : ""}`}
+              aria-expanded={publicNavOpen}
+              aria-controls="landing-nav-links"
+              aria-label={publicNavOpen ? "Cerrar navegacion" : "Abrir navegacion"}
+              onClick={() => setPublicNavOpen((prev) => !prev)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+          ) : null}
+        </div>
       </div>
     </header>
   );
@@ -4628,30 +4776,12 @@ function App() {
               <>
                 {!isAdminLoginPortal ? (
                   <>
-                    <div className="login-sso-actions">
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={() => loginWithSSO("google")}
-                        disabled={!publicAuthConfig.allow_google_sso || !effectiveGoogleClientId}
-                      >
-                        Continuar con Google
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        onClick={() => loginWithSSO("facebook")}
-                        disabled={!publicAuthConfig.allow_facebook_sso || !effectiveFacebookAppId}
-                      >
-                        Continuar con Facebook
-                      </button>
-                    </div>
-                    <small className="login-config-hint">
-                      {`Google: ${effectiveGoogleClientId ? "disponible" : "no disponible"} | Facebook: ${effectiveFacebookAppId ? "disponible" : "no disponible"}`}
-                    </small>
-                    <div className="login-separator">
-                      <span>{isCompanyLoginPortal ? "o con usuario y contrasena de empresa" : "o con usuario y contrasena"}</span>
-                    </div>
+                    {renderLoginSsoButtons({ mode: "signin" })}
+                    {activeSocialProviders.length ? (
+                      <div className="login-separator">
+                        <span>{isCompanyLoginPortal ? "o con usuario y contrasena de empresa" : "o con usuario y contrasena"}</span>
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
                 <form onSubmit={login} className="login-form">
@@ -4676,30 +4806,12 @@ function App() {
               </>
             ) : loginPortalType === "company" ? (
               <form onSubmit={registerCompany} className="login-form">
-                <div className="login-sso-actions">
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => loginWithSSO("google")}
-                    disabled={!publicAuthConfig.allow_google_sso || !effectiveGoogleClientId || !selectedCompanyPlan}
-                  >
-                    Crear con Google
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => loginWithSSO("facebook")}
-                    disabled={!publicAuthConfig.allow_facebook_sso || !effectiveFacebookAppId || !selectedCompanyPlan}
-                  >
-                    Crear con Facebook
-                  </button>
-                </div>
-                <small className="login-config-hint">
-                  Crea el estudio con Google o Facebook, o completa el formulario manualmente.
-                </small>
-                <div className="login-separator">
-                  <span>o crea tu cuenta con email y contrasena</span>
-                </div>
+                {renderLoginSsoButtons({ mode: "signup", requirePlan: true })}
+                {activeSocialProviders.length ? (
+                  <div className="login-separator">
+                    <span>o crea tu cuenta con email y contrasena</span>
+                  </div>
+                ) : null}
                 <div className="company-plan-callout">
                   <div>
                     <p className="pricing-tag">Plan seleccionado</p>
@@ -7900,7 +8012,7 @@ function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isMobileViewport ? "app-shell-mobile" : ""}`}>
       {isSSOCallbackPath(pathname)
         ? renderSSOCallback
         : isDiscoverPath(pathname)

@@ -31,6 +31,7 @@ body {
 
 .app-shell {
   min-height: 100vh;
+  overflow-x: clip;
   background:
     radial-gradient(circle at 0% -10%, rgba(var(--accent-rgb), 0.08), transparent 30%),
     radial-gradient(circle at 100% 0%, rgba(79, 87, 119, 0.1), transparent 35%),
@@ -93,6 +94,13 @@ body {
   flex-wrap: wrap;
 }
 
+.landing-nav-shell {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
 .landing-nav-link {
   border: 0;
   background: transparent;
@@ -126,6 +134,54 @@ body {
 
 .landing-cta-btn:hover {
   background: linear-gradient(120deg, var(--accent-hover), var(--accent-strong));
+}
+
+.landing-menu-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.landing-menu-toggle {
+  display: none;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.26rem;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.1);
+}
+
+.landing-menu-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.landing-menu-toggle.active span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.landing-menu-toggle.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.landing-menu-toggle.active span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.landing-cta-btn-mobile {
+  display: none;
 }
 
 .marketing-topbar {
@@ -1243,31 +1299,68 @@ body {
   box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.14);
 }
 
+.login-sso-block {
+  display: grid;
+  gap: 0.5rem;
+}
+
 .login-sso-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
 }
 
-.hero-login-card .secondary-btn {
-  border: 1px solid #d0d5dd;
-  border-radius: 12px;
-  background: #f2f4f7;
-  color: #667085;
+.login-sso-actions.single-provider {
+  grid-template-columns: 1fr;
+}
+
+.sso-brand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.72rem;
+  min-height: 56px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(247, 249, 252, 0.96));
+  color: #0f172a;
   font-weight: 700;
-  padding: 0.72rem 0.85rem;
+  padding: 0.82rem 1rem;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
-.hero-login-card .secondary-btn:hover {
-  background: #e9edf3;
+.sso-brand-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
 }
 
-.hero-login-card .secondary-btn:disabled {
-  background: #f2f4f7;
-  color: #98a2b3;
-  border-color: #e4e7ec;
-  opacity: 1;
+.sso-brand-btn.google:hover {
+  border-color: rgba(66, 133, 244, 0.28);
+}
+
+.sso-brand-btn.facebook:hover {
+  border-color: rgba(24, 119, 242, 0.28);
+}
+
+.sso-brand-btn:disabled {
+  opacity: 0.62;
   cursor: not-allowed;
+  transform: none;
+}
+
+.sso-brand-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+}
+
+.sso-brand-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .login-config-hint {
@@ -1275,6 +1368,7 @@ body {
   margin-top: 0.35rem;
   color: #667085;
   font-size: 0.78rem;
+  text-align: center;
 }
 
 .register-step-title {
@@ -3597,12 +3691,112 @@ button:disabled {
   }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 820px) {
+  .portal-shell,
+  .portal-shell-sm,
+  .discover-shell {
+    width: calc(100% - 1rem);
+  }
+
   .landing-menu-primary {
     min-height: auto;
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
+    row-gap: 0.65rem;
+  }
+
+  .landing-menu-toggle {
+    display: inline-flex;
+  }
+
+  .landing-nav-shell {
+    grid-column: 1 / -1;
+    display: none;
+    width: 100%;
+  }
+
+  .landing-nav-shell.open {
+    display: grid;
+    gap: 0.8rem;
+  }
+
+  .landing-nav-links {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .landing-nav-link {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 0.8rem 0.95rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .landing-cta-btn-mobile {
+    display: inline-flex;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .discover-toolbar,
+  .admin-users-create,
+  .admin-user-create-form,
+  .admin-user-grid,
+  .admin-owner-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-tab-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-tab-btn {
+    width: 100%;
+  }
+
+  .portal-header {
+    gap: 0.8rem;
+  }
+
+  .portal-header > button,
+  .trial-banner {
+    width: 100%;
+  }
+
+  .app-launcher-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .odoo-company-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    padding: 0.9rem 1rem 0;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .odoo-company-tabs button {
+    border: 1px solid #d0d5db;
+    border-radius: 12px;
+    padding: 0.7rem 0.8rem;
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .odoo-company-tabs button.active {
+    border-top: 1px solid #d0d5db;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+  }
+}
+
+@media (max-width: 680px) {
+  .landing-menu-primary {
     row-gap: 0.55rem;
   }
 
@@ -3615,14 +3809,12 @@ button:disabled {
   }
 
   .landing-nav-links {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
     gap: 0.35rem;
   }
 
   .landing-nav-link {
     font-size: 0.86rem;
-    padding: 0.4rem 0.58rem;
+    padding: 0.72rem 0.78rem;
   }
 
   .landing-cta-btn {
@@ -3820,6 +4012,14 @@ button:disabled {
     align-items: stretch;
   }
 
+  .admin-tab-list,
+  .odoo-company-tabs,
+  .app-launcher-grid,
+  .a11y-grid,
+  .branch-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .table-premium {
     display: block;
     overflow-x: auto;
@@ -3876,6 +4076,17 @@ button:disabled {
 }
 
 @media (max-width: 520px) {
+  .portal-shell,
+  .portal-shell-sm,
+  .discover-shell {
+    width: calc(100% - 0.75rem);
+  }
+
+  .panel-card {
+    padding: 0.85rem;
+    border-radius: 16px;
+  }
+
   .hero-login-card h2 {
     font-size: 1.92rem;
   }

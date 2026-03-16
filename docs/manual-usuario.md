@@ -1,6 +1,6 @@
 ﻿# Manual de Usuario - NILA
-Version: `1.0`
-Fecha: `2026-03-11`
+Version: `1.1`
+Fecha: `2026-03-16`
 
 ## 1. Introduccion
 NILA tiene 4 experiencias de uso:
@@ -16,8 +16,13 @@ Menu superior:
 - Quienes somos
 - Precios y planes
 - Login empresas
+- Login admin
 - Login alumnos
 - Buscar tu centro mas cercano
+
+En celular:
+- El menu se pliega en un boton hamburguesa.
+- Las secciones y formularios se apilan para evitar desalineaciones.
 
 ## 3. Descubrir centros (publico)
 URL: `/descubrir-centros`
@@ -38,6 +43,11 @@ Opciones:
 - Google SSO (si esta habilitado)
 - Facebook SSO (si esta habilitado)
 
+Registro de empresa:
+- Crear estudio con email/contrasena
+- O iniciar con Google/Facebook si el admin lo habilito
+- Elegir plan inicial y activar trial
+
 Registro marketplace:
 - Seleccionar empresa
 - Cargar datos personales
@@ -54,6 +64,8 @@ Funciones principales:
 - Reset de contrasena
 - Alta/baja de owner en organizaciones
 - Configuracion SSO Google/Facebook
+- Gestion de planes de plataforma
+- Publicacion de planes en la landing publica
 - Activar/desactivar organizaciones
 - Configurar suscripcion y modulos habilitados por organizacion
 - Ver resumen global y pagos
@@ -71,6 +83,10 @@ Funciones principales:
 - Alta/edicion/bloqueo de salones
 - Gestion de alumnos y su historial
 - Gestion de clases
+- Gestion de instructores y su costo operativo
+- Liquidacion mensual de instructores
+- Gestion de suscripcion de plataforma y estado de trial
+- Configuracion de planes/suscripciones para clientes
 - Gestion de planes, pagos y comprobantes
 
 Reglas importantes:
@@ -94,6 +110,7 @@ Funciones principales:
 6. Crear clases
 7. Configurar planes y cobros
 8. Emitir comprobantes cuando corresponda
+9. Revisar liquidacion de instructores
 
 ## 9. Preguntas frecuentes
 ### No puedo ingresar con Google/Facebook
@@ -110,6 +127,11 @@ Funciones principales:
 
 ### No aparece mi empresa en marketplace
 - Debe estar activa y con suscripcion habilitada.
+
+### En celular se ve mal una pantalla
+- Forzar recarga del navegador.
+- Verificar que el menu este cerrado antes de navegar.
+- Reportar captura indicando modelo de telefono y orientacion.
 
 ## 10. Soporte operativo
 Cuando reportes un problema, incluir:

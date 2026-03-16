@@ -1,9 +1,9 @@
 ﻿# NILA - Plataforma Inteligente para Estudios de Pilates
 
 Documento de Requerimientos Funcionales y No Funcionales (FRD + NFR)
-Version: `4.0`
+Version: `4.1`
 Autor: `Nicolas Passalacqua`
-Fecha: `2026-03-11`
+Fecha: `2026-03-16`
 
 ## 1. Introduccion
 NILA es una plataforma digital para la gestion integral de estudios de Pilates con operacion multi-portal:
@@ -31,13 +31,18 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 
 ## 4. Alcance actual (MVP implementado)
 - Autenticacion JWT local y SSO (Google/Facebook) condicionado por configuracion global.
+- Login y alta de empresa/alumno con rutas diferenciadas por portal.
 - Marketplace publico de organizaciones con geolocalizacion y mapa.
-- Administracion global de usuarios, roles, owner-organizacion y settings de plataforma.
+- Administracion global de usuarios, roles, owner-organizacion, settings de plataforma y planes de suscripcion de plataforma.
 - Modulo Organizacion/Sedes/Salones.
 - Modulo Alumnos con historial y autoasociacion a empresas.
 - Modulo Clases con validaciones de capacidad, solapamientos y bloqueos de salon.
+- Modulo Instructores con esquema economico y liquidacion mensual.
 - Modulo Pagos/Membresias/Comprobantes (flujo MercadoPago simulado + emision ARCA simulada).
+- Suscripcion de plataforma con trial, pago manual y Mercado Pago.
+- Configuracion comercial owner para planes/suscripciones de sus clientes.
 - Dashboard resumido por perfil.
+- Frontend responsive con navegacion adaptada a mobile.
 
 ## 5. Requerimientos funcionales
 
@@ -50,6 +55,9 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-068 | Resolver portal por perfil | Determinar experiencia segun rol al autenticarse | Sistema | Alta |
 | FR-069 | Reset de contrasena | Reasignar contrasena de usuarios | Administrador global | Alta |
 | FR-070 | Eliminar usuario | Eliminar usuarios no requeridos | Administrador global | Alta |
+| FR-077 | Login SSO de empresa | Login/alta de owner por Google/Facebook segun policy global | Owner / Sistema | Alta |
+| FR-078 | Configuracion global de planes de plataforma | Alta/edicion/publicacion de planes comerciales de NILA | Administrador global | Alta |
+| FR-079 | Asignacion de plan a organizacion | Asignar plan de plataforma y estado de suscripcion por empresa | Administrador global | Alta |
 
 ## 5.2 Organizacion y sedes
 | ID | Requerimiento | Descripcion | Actor | Prioridad |
@@ -93,7 +101,15 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-018 | Cancelar clase | Cancelar clase programada | Instructor | Media |
 | FR-018A | Evitar solapamientos | Evitar choque de salon o instructor en el mismo rango horario | Sistema | Alta |
 
-## 5.6 Pagos y finanzas
+## 5.6 Instructores y costo operativo
+| ID | Requerimiento | Descripcion | Actor | Prioridad |
+|---|---|---|---|---|
+| FR-080 | Alta de instructor | Crear usuario instructor con acceso operativo | Owner | Alta |
+| FR-081 | Configurar esquema de liquidacion | Definir pago por hora, mensual, por clase o mixto | Owner | Alta |
+| FR-082 | Medir horas y clases por instructor | Calcular actividad mensual desde clases asignadas | Sistema | Alta |
+| FR-083 | Liquidacion mensual de instructores | Generar resumen, monto y estado pagado/pendiente | Owner | Alta |
+
+## 5.7 Pagos y finanzas
 | ID | Requerimiento | Descripcion | Actor | Prioridad |
 |---|---|---|---|---|
 | FR-023 | Integracion MercadoPago | Flujo de checkout por pago | Sistema | Alta |
@@ -102,8 +118,16 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-026 | Registro automatico de pagos | Actualizar estado por webhook/manual | Sistema | Alta |
 | FR-027 | Historial de pagos | Visualizar pagos por perfil | Admin / Owner / Alumno | Alta |
 | FR-027A | Facturacion electronica (ARCA) | Emision de comprobantes sobre pagos aprobados | Sistema | Alta |
+| FR-084 | Cobro de suscripcion de plataforma | Generar solicitud de pago owner por plan de NILA | Owner | Alta |
+| FR-085 | Trial de plataforma visible | Mostrar estado y tiempo restante del trial en portal owner | Sistema | Alta |
 
-## 5.7 Marketplace publico y marketing
+## 5.8 Suscripciones comerciales del owner
+| ID | Requerimiento | Descripcion | Actor | Prioridad |
+|---|---|---|---|---|
+| FR-086 | Configurar planes para clientes | Owner define planes comerciales para sus alumnos | Owner | Alta |
+| FR-087 | Exponer atributos del plan comercial | Precio, moneda, vigencia, descripcion y clases por semana | Owner | Alta |
+
+## 5.9 Marketplace publico y marketing
 | ID | Requerimiento | Descripcion | Actor | Prioridad |
 |---|---|---|---|---|
 | FR-071 | Descubrir centros sin login | Busqueda publica de centros por nombre/ciudad/direccion | Publico | Alta |
@@ -112,6 +136,7 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-074 | Navegacion a Google Maps | Abrir "como llegar" y mapa externo del centro seleccionado | Publico | Alta |
 | FR-075 | Seccion Quienes somos | Landing publica informativa | Publico | Media |
 | FR-076 | Seccion Precios y planes | Landing publica comercial | Publico | Media |
+| FR-088 | Publicacion de planes de plataforma | Mostrar en web solo planes activos/publicos definidos por admin | Sistema / Publico | Alta |
 
 ## 6. Requerimientos no funcionales (NFR)
 
@@ -147,6 +172,7 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | RNF-032 | Usabilidad | Navegacion por portal y menu publico consistente |
 | RNF-033 | Responsive | Pantallas clave usables en desktop y mobile |
 | RNF-034 | Accesibilidad base | Atajos/herramientas de accesibilidad en frontend |
+| RNF-035 | Configuracion frontend portable | URL de API y credenciales publicas configurables en runtime |
 
 ## 7. Reglas de negocio clave
 - Un owner solo puede crear una empresa.
@@ -155,6 +181,8 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 - Razon social se bloquea cuando existe emision fiscal.
 - Capacidad de clase no puede superar capacidad de salon.
 - Salon bloqueado o con conflicto horario no se puede asignar a clase.
+- Un plan de plataforma puede ser visible en web sin permitir alta autogestionada.
+- La liquidacion de instructores depende del esquema economico configurado por empresa.
 
 ## 8. Integraciones y dependencias
 - Autenticacion social: Google OAuth (token validation) y Facebook Graph API.
@@ -167,7 +195,7 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 - Frontend: React + Vite.
 - Backend: Django + Django REST Framework + SimpleJWT.
 - DB: PostgreSQL.
-- Infra: Docker Compose, ECR, EC2.
+- Infra: Docker Compose, ECR, ECS/Fargate, EC2.
 - Repositorio: GitHub.
 
 ## 10. Criterio de cierre (Definition of Done documental)
