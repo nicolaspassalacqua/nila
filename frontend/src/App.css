@@ -1917,6 +1917,18 @@ button:disabled {
   margin: 0 auto 1rem;
 }
 
+.login-error-banner {
+  margin: -0.1rem 0 0;
+  border: 1px solid rgba(185, 28, 28, 0.16);
+  border-radius: 12px;
+  background: rgba(254, 242, 242, 0.96);
+  color: #b42318;
+  padding: 0.72rem 0.8rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
 .odoo-menu {
   margin-top: 0.8rem;
   display: flex;

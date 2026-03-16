@@ -2064,11 +2064,17 @@ function App() {
         : loginPortalType === "admin"
           ? "admin"
           : "company";
-    const response = await fetch(`${API_URL}/api/auth/portal-login/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, portal_type: portalTypeForLogin }),
-    });
+    let response;
+    try {
+      response = await fetch(`${API_URL}/api/auth/portal-login/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, portal_type: portalTypeForLogin }),
+      });
+    } catch (_error) {
+      setError("No se pudo conectar con el servidor. Revisa backend, red o CORS.");
+      return;
+    }
 
     if (!response.ok) {
       setError(await extractErrorMessage(response, "Login invalido"));
@@ -4643,6 +4649,7 @@ function App() {
                     Contrasena
                     <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" />
                   </label>
+                  {error ? <p className="login-error-banner">{error}</p> : null}
                   <button type="submit">Ingresar</button>
                   {isStudentLoginPortal ? (
                     <small>Portal de alumnos: cuenta con rol "alumno".</small>
@@ -7983,7 +7990,7 @@ function App() {
         </aside>
       ) : null}
 
-      {token && error ? <p className="global-error">{error}</p> : null}
+      {error && !loginModalOpen ? <p className="global-error">{error}</p> : null}
     </div>
   );
 }
