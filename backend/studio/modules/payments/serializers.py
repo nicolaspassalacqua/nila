@@ -119,6 +119,11 @@ class PaymentSerializer(serializers.ModelSerializer):
                 errors["membership_plan"] = "membership_plan es requerido para pago de membresia"
             if studio_class:
                 errors["studio_class"] = "No corresponde para pago de membresia"
+        elif payment_type == Payment.TYPE_PLATFORM_SUBSCRIPTION:
+            if studio_class:
+                errors["studio_class"] = "No corresponde para pago de suscripcion de plataforma"
+            if membership_plan:
+                errors["membership_plan"] = "No corresponde para pago de suscripcion de plataforma"
         else:
             errors["payment_type"] = "Tipo de pago invalido"
 

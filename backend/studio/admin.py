@@ -3,12 +3,15 @@
 from .models import (
     DashboardSnapshot,
     Establishment,
+    InstructorProfile,
+    InstructorSettlement,
     Invoice,
     MembershipPlan,
     Organization,
     OrganizationMembership,
     Payment,
     PlatformSetting,
+    PlatformSubscriptionPlan,
     Room,
     StudioClass,
     Student,
@@ -19,14 +22,15 @@ from .models import (
 
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "is_active", "created_at")
+    list_display = ("id", "name", "subscription_plan", "subscription_status", "subscription_enabled", "is_active", "created_at")
     search_fields = ("name", "legal_name", "tax_id")
+    list_filter = ("subscription_status", "subscription_enabled", "is_active")
 
 
 @admin.register(Establishment)
 class EstablishmentAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "organization", "city", "is_active")
-    search_fields = ("name", "city")
+    list_display = ("id", "name", "organization", "city", "phone", "email", "is_active")
+    search_fields = ("name", "city", "phone", "email")
     list_filter = ("organization", "is_active")
 
 
@@ -42,6 +46,44 @@ class StudioClassAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "organization", "establishment", "instructor", "start_at", "status")
     list_filter = ("organization", "establishment", "status")
     search_fields = ("name", "instructor__username")
+
+
+@admin.register(InstructorProfile)
+class InstructorProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "organization",
+        "compensation_scheme",
+        "hourly_rate",
+        "monthly_salary",
+        "class_rate",
+        "currency",
+        "is_active",
+    )
+    list_filter = ("organization", "compensation_scheme", "currency", "is_active")
+    search_fields = ("user__username", "user__email", "organization__name")
+
+
+@admin.register(InstructorSettlement)
+class InstructorSettlementAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "organization",
+        "instructor_profile",
+        "period_year",
+        "period_month",
+        "status",
+        "amount",
+        "currency",
+        "paid_at",
+    )
+    list_filter = ("organization", "status", "currency", "period_year", "period_month")
+    search_fields = (
+        "organization__name",
+        "instructor_profile__user__username",
+        "instructor_profile__user__email",
+    )
 
 
 @admin.register(Student)
@@ -100,4 +142,21 @@ class OrganizationMembershipAdmin(admin.ModelAdmin):
 
 @admin.register(PlatformSetting)
 class PlatformSettingAdmin(admin.ModelAdmin):
-    list_display = ("id", "singleton_key", "allow_google_sso", "allow_facebook_sso", "updated_at")
+    list_display = ("id", "singleton_key", "allow_google_sso", "allow_facebook_sso", "google_client_id", "facebook_app_id", "updated_at")
+
+
+@admin.register(PlatformSubscriptionPlan)
+class PlatformSubscriptionPlanAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "code",
+        "name",
+        "price",
+        "currency",
+        "billing_period",
+        "allow_self_signup",
+        "is_public",
+        "is_active",
+    )
+    list_filter = ("is_active", "is_public", "allow_self_signup", "billing_period")
+    search_fields = ("code", "name", "marketing_tag")

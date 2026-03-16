@@ -29,9 +29,11 @@ class MembershipPlan(models.Model):
 class Payment(models.Model):
     TYPE_CLASS = "class_single"
     TYPE_MEMBERSHIP = "membership"
+    TYPE_PLATFORM_SUBSCRIPTION = "platform_subscription"
     TYPE_CHOICES = (
         (TYPE_CLASS, "Pago de clase"),
         (TYPE_MEMBERSHIP, "Pago de membresia"),
+        (TYPE_PLATFORM_SUBSCRIPTION, "Suscripcion de plataforma"),
     )
 
     PROVIDER_MP = "mercadopago"
@@ -77,7 +79,7 @@ class Payment(models.Model):
         blank=True,
         related_name="created_payments",
     )
-    payment_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    payment_type = models.CharField(max_length=32, choices=TYPE_CHOICES)
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default=PROVIDER_MP)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     description = models.CharField(max_length=240, blank=True)
@@ -130,4 +132,3 @@ class Invoice(models.Model):
 
     def __str__(self):
         return f"{self.payment_id} - {self.status}"
-

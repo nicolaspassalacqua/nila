@@ -51,16 +51,28 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "nila"),
-        "USER": os.getenv("POSTGRES_USER", "nila"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "nila"),
-        "HOST": os.getenv("POSTGRES_HOST", "db"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+USE_SQLITE = os.getenv("DJANGO_USE_SQLITE", "0") == "1"
+DB_ENGINE = (os.getenv("DJANGO_DB_ENGINE", "") or "").strip().lower()
+
+if USE_SQLITE or DB_ENGINE in ("sqlite", "sqlite3"):
+    sqlite_path = os.getenv("SQLITE_PATH", str(BASE_DIR / "db.sqlite3"))
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": sqlite_path,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "nila"),
+            "USER": os.getenv("POSTGRES_USER", "nila"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "nila"),
+            "HOST": os.getenv("POSTGRES_HOST", "db"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        }
+    }
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

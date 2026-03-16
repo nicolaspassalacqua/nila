@@ -7,7 +7,7 @@ from django.utils import timezone
 from studio.models import Establishment, Organization, OrganizationMembership, Room
 from studio.modules.users.services import is_owner, is_platform_admin
 
-from .serializers import EstablishmentSerializer, OrganizationSerializer, RoomSerializer
+from .serializers import EstablishmentSerializer, OrganizationListSerializer, OrganizationSerializer, RoomSerializer
 
 
 def get_owned_org_ids(user):
@@ -21,11 +21,19 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     serializer_class = OrganizationSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_class(self):
+        user = self.request.user
+        if self.action == "list" and is_platform_admin(user):
+            return OrganizationListSerializer
+        return OrganizationSerializer
+
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
 
         if is_platform_admin(user):
+            if self.action == "list":
+                return queryset.defer("logo")
             return queryset
 
         if is_owner(user):
@@ -55,6 +63,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             payload["is_active"] = True
             payload["subscription_enabled"] = False
             payload["subscription_plan"] = ""
+            payload["subscription_status"] = Organization.SUBSCRIPTION_STATUS_INACTIVE
+            payload["trial_starts_at"] = None
+            payload["trial_ends_at"] = None
             payload.pop("enabled_modules", None)
             payload.pop("mercadolibre_enabled", None)
             payload.pop("electronic_billing_enabled", None)
@@ -97,6 +108,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             payload.pop("is_active", None)
             payload.pop("subscription_enabled", None)
             payload.pop("subscription_plan", None)
+            payload.pop("subscription_status", None)
+            payload.pop("trial_starts_at", None)
+            payload.pop("trial_ends_at", None)
             payload.pop("enabled_modules", None)
             payload.pop("mercadolibre_enabled", None)
             payload.pop("electronic_billing_enabled", None)

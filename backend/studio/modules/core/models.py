@@ -2,7 +2,7 @@
 
 
 def default_enabled_modules():
-    return ["configuracion", "pos", "alumnos", "clases", "tutoriales", "tableros", "contactos", "redes_sociales"]
+    return ["configuracion", "pos", "alumnos", "clases", "instructores", "tutoriales", "tableros", "contactos", "redes_sociales"]
 
 
 def default_weekly_hours():
@@ -49,6 +49,18 @@ class Organization(models.Model):
         (BILLING_ENV_TEST, "Homologacion"),
         (BILLING_ENV_PROD, "Produccion"),
     )
+    SUBSCRIPTION_STATUS_INACTIVE = "inactive"
+    SUBSCRIPTION_STATUS_TRIALING = "trialing"
+    SUBSCRIPTION_STATUS_ACTIVE = "active"
+    SUBSCRIPTION_STATUS_PAST_DUE = "past_due"
+    SUBSCRIPTION_STATUS_CANCELED = "canceled"
+    SUBSCRIPTION_STATUS_CHOICES = (
+        (SUBSCRIPTION_STATUS_INACTIVE, "Inactiva"),
+        (SUBSCRIPTION_STATUS_TRIALING, "Prueba"),
+        (SUBSCRIPTION_STATUS_ACTIVE, "Activa"),
+        (SUBSCRIPTION_STATUS_PAST_DUE, "Pago pendiente"),
+        (SUBSCRIPTION_STATUS_CANCELED, "Cancelada"),
+    )
 
     name = models.CharField(max_length=150, unique=True)
     logo = models.TextField(blank=True)
@@ -63,12 +75,19 @@ class Organization(models.Model):
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
     fiscal_street = models.CharField(max_length=120, blank=True)
+    fiscal_street_line2 = models.CharField(max_length=120, blank=True)
     fiscal_street_number = models.CharField(max_length=20, blank=True)
     fiscal_floor = models.CharField(max_length=20, blank=True)
     fiscal_apartment = models.CharField(max_length=20, blank=True)
     fiscal_city = models.CharField(max_length=100, blank=True)
     fiscal_province = models.CharField(max_length=100, blank=True)
     fiscal_postal_code = models.CharField(max_length=20, blank=True)
+    fiscal_country = models.CharField(max_length=80, blank=True)
+    website_url = models.URLField(blank=True)
+    email_domain = models.CharField(max_length=120, blank=True)
+    brand_color = models.CharField(max_length=20, blank=True)
+    company_registry_id = models.CharField(max_length=40, blank=True)
+    currency = models.CharField(max_length=8, blank=True, default="ARS")
     activity_start_date = models.DateField(null=True, blank=True)
     main_activity_code = models.CharField(max_length=20, blank=True)
     fiscal_email = models.EmailField(blank=True)
@@ -85,6 +104,13 @@ class Organization(models.Model):
     is_active = models.BooleanField(default=True)
     subscription_enabled = models.BooleanField(default=False)
     subscription_plan = models.CharField(max_length=80, blank=True)
+    subscription_status = models.CharField(
+        max_length=20,
+        choices=SUBSCRIPTION_STATUS_CHOICES,
+        default=SUBSCRIPTION_STATUS_INACTIVE,
+    )
+    trial_starts_at = models.DateTimeField(null=True, blank=True)
+    trial_ends_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -96,6 +122,8 @@ class Establishment(models.Model):
     name = models.CharField(max_length=150)
     address = models.CharField(max_length=200, blank=True)
     city = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    email = models.EmailField(blank=True)
     open_time = models.TimeField(null=True, blank=True)
     close_time = models.TimeField(null=True, blank=True)
     weekly_hours = models.JSONField(default=default_weekly_hours, blank=True)

@@ -4,21 +4,31 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import timedelta
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import Prefetch
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from studio.models import Establishment, Organization, OrganizationMembership, PlatformSetting, Student, StudentHistory
+from studio.models import (
+    Establishment,
+    Organization,
+    OrganizationMembership,
+    PlatformSetting,
+    PlatformSubscriptionPlan,
+    Student,
+    StudentHistory,
+)
 from studio.modules.students.serializers import StudentSerializer
 
-from .serializers import PlatformSettingSerializer, UserSerializer
+from .serializers import PlatformSettingSerializer, PlatformSubscriptionPlanSerializer, UserSerializer
 from .services import ROLE_NAMES, ensure_roles_exist, get_user_roles, is_platform_admin, is_student
 
 User = get_user_model()
@@ -59,6 +69,22 @@ def _generate_unique_username(seed):
         candidate = f"{base}{index}"
         index += 1
     return candidate
+
+
+def _authenticate_by_identifier(request, identifier, password):
+    candidate = (identifier or "").strip()
+    if not candidate or not password:
+        return None
+
+    user = authenticate(request=request, username=candidate, password=password)
+    if user:
+        return user
+
+    matched_user = User.objects.filter(email__iexact=candidate).order_by("id").first()
+    if not matched_user:
+        return None
+
+    return authenticate(request=request, username=matched_user.username, password=password)
 
 
 def _parse_full_name(full_name):
@@ -116,8 +142,9 @@ def _verify_facebook_access_token(access_token):
     if not email:
         raise SSOValidationError("email_not_provided", "Facebook no devolvio email. Asegura permiso de email.")
 
-    app_id = (os.getenv("FACEBOOK_APP_ID", "") or "").strip()
-    app_secret = (os.getenv("FACEBOOK_APP_SECRET", "") or "").strip()
+    setting = get_platform_setting()
+    app_id = (setting.facebook_app_id or os.getenv("FACEBOOK_APP_ID", "") or "").strip()
+    app_secret = (setting.facebook_app_secret or os.getenv("FACEBOOK_APP_SECRET", "") or "").strip()
     if app_id and app_secret:
         app_token = f"{app_id}|{app_secret}"
         debug_query = urllib.parse.urlencode({"input_token": token, "access_token": app_token})
@@ -143,6 +170,78 @@ def _assign_student_role(user):
     user.groups.add(Group.objects.get(name="alumno"))
 
 
+def _assign_owner_role(user):
+    ensure_roles_exist()
+    user.groups.add(Group.objects.get(name="owner"))
+
+
+def _get_active_platform_plans():
+    return PlatformSubscriptionPlan.objects.filter(is_active=True).order_by("sort_order", "id")
+
+
+def _get_public_platform_plans():
+    return _get_active_platform_plans().filter(is_public=True)
+
+
+def _get_self_signup_plan(code):
+    normalized = (code or "").strip().lower()
+    if not normalized:
+        raise ValueError("subscription_plan es requerido")
+    try:
+        return PlatformSubscriptionPlan.objects.get(code=normalized, is_active=True, allow_self_signup=True)
+    except PlatformSubscriptionPlan.DoesNotExist as exc:
+        raise ValueError("El plan seleccionado no esta disponible para alta autogestionada") from exc
+
+
+def _create_trial_organization_for_owner(*, user, organization_name, legal_name, email, phone, subscription_plan):
+    trial_started_at = timezone.now()
+    trial_ends_at = trial_started_at + timedelta(days=subscription_plan.trial_days or 0)
+    organization = Organization.objects.create(
+        name=organization_name,
+        legal_name=legal_name or organization_name,
+        email=email,
+        phone=phone,
+        is_active=True,
+        enabled_modules=subscription_plan.included_modules or [],
+        mercadolibre_enabled=bool(subscription_plan.mercadolibre_enabled),
+        electronic_billing_enabled=bool(subscription_plan.electronic_billing_enabled),
+        subscription_enabled=True,
+        subscription_plan=subscription_plan.code,
+        subscription_status=Organization.SUBSCRIPTION_STATUS_TRIALING,
+        trial_starts_at=trial_started_at,
+        trial_ends_at=trial_ends_at,
+    )
+    OrganizationMembership.objects.create(
+        user=user,
+        organization=organization,
+        role=OrganizationMembership.ROLE_OWNER,
+        is_active=True,
+    )
+    return organization
+
+
+def _serialize_public_platform_plan(plan):
+    return {
+        "id": plan.id,
+        "code": plan.code,
+        "name": plan.name,
+        "marketing_tag": plan.marketing_tag,
+        "description": plan.description,
+        "price": str(plan.price),
+        "currency": plan.currency,
+        "billing_period": plan.billing_period,
+        "trial_days": plan.trial_days,
+        "cta_label": plan.cta_label,
+        "features": plan.features or [],
+        "included_modules": plan.included_modules or [],
+        "mercadolibre_enabled": bool(plan.mercadolibre_enabled),
+        "electronic_billing_enabled": bool(plan.electronic_billing_enabled),
+        "is_active": bool(plan.is_active),
+        "is_public": bool(plan.is_public),
+        "allow_self_signup": bool(plan.allow_self_signup),
+    }
+
+
 def _get_marketplace_organizations():
     active_establishments = Establishment.objects.filter(is_active=True).order_by("name")
     return (
@@ -150,6 +249,14 @@ def _get_marketplace_organizations():
         .prefetch_related(Prefetch("establishments", queryset=active_establishments))
         .order_by("name")
     )
+
+
+def _marketplace_logo_payload(logo):
+    # Avoid sending oversized base64 blobs in public listings.
+    if not logo:
+        return ""
+    value = str(logo)
+    return value if len(value) <= 120_000 else ""
 
 
 def _parse_establishment_ids(raw_value):
@@ -229,11 +336,12 @@ def _upsert_student_profile_for_org(
 def auth_marketplace_organizations(_request):
     setting = get_platform_setting()
     organizations = _get_marketplace_organizations()
+    plans = [_serialize_public_platform_plan(plan) for plan in _get_public_platform_plans()]
     payload = [
         {
             "id": org.id,
             "name": org.name,
-            "logo": org.logo,
+            "logo": _marketplace_logo_payload(org.logo),
             "subscription_plan": org.subscription_plan,
             "city": org.fiscal_city or "",
             "address": org.address or "",
@@ -256,6 +364,9 @@ def auth_marketplace_organizations(_request):
         {
             "allow_google_sso": setting.allow_google_sso,
             "allow_facebook_sso": setting.allow_facebook_sso,
+            "google_client_id": setting.google_client_id or os.getenv("GOOGLE_CLIENT_ID", "") or os.getenv("VITE_GOOGLE_CLIENT_ID", ""),
+            "facebook_app_id": setting.facebook_app_id or os.getenv("FACEBOOK_APP_ID", "") or os.getenv("VITE_FACEBOOK_APP_ID", ""),
+            "plans": plans,
             "organizations": payload,
         }
     )
@@ -339,6 +450,87 @@ def auth_register_student(request):
     )
 
 
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def auth_register_company(request):
+    organization_name = (request.data.get("organization_name") or request.data.get("company_name") or "").strip()
+    legal_name = (request.data.get("legal_name") or "").strip()
+    username = (request.data.get("username") or "").strip()
+    email = (request.data.get("email") or "").strip().lower()
+    password = (request.data.get("password") or "").strip()
+    first_name = (request.data.get("first_name") or "").strip()
+    last_name = (request.data.get("last_name") or "").strip()
+    phone = (request.data.get("phone") or "").strip()
+    subscription_plan_code = request.data.get("subscription_plan")
+
+    if not organization_name:
+        return Response({"detail": "organization_name es requerido"}, status=status.HTTP_400_BAD_REQUEST)
+    if not email:
+        return Response({"detail": "email es requerido"}, status=status.HTTP_400_BAD_REQUEST)
+    if len(password) < 8:
+        return Response({"detail": "La contrasena debe tener al menos 8 caracteres"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        subscription_plan = _get_self_signup_plan(subscription_plan_code)
+    except ValueError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    if Organization.objects.filter(name__iexact=organization_name).exists():
+        return Response({"detail": "Ya existe una empresa con este nombre"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(email__iexact=email).exists():
+        return Response(
+            {"detail": "Ya existe un usuario con este email. Inicia sesion para continuar."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not username:
+        username = _generate_unique_username(organization_name)
+    elif User.objects.filter(username__iexact=username).exists():
+        return Response({"detail": "username ya esta en uso"}, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        _assign_owner_role(user)
+        organization = _create_trial_organization_for_owner(
+            user=user,
+            organization_name=organization_name,
+            legal_name=legal_name,
+            email=email,
+            phone=phone,
+            subscription_plan=subscription_plan,
+        )
+
+    return Response(
+        {
+            "tokens": _build_tokens(user),
+            "organization": {
+                "id": organization.id,
+                "name": organization.name,
+                "subscription_plan": organization.subscription_plan,
+                "subscription_status": organization.subscription_status,
+                "trial_starts_at": organization.trial_starts_at,
+                "trial_ends_at": organization.trial_ends_at,
+                "trial_days": subscription_plan.trial_days,
+            },
+            "owner": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+            },
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
 def _auth_sso(provider, request):
     setting = get_platform_setting()
     if provider == Student.AUTH_PROVIDER_GOOGLE and not setting.allow_google_sso:
@@ -370,26 +562,24 @@ def _auth_sso(provider, request):
         )
 
     email = identity["email"]
+    portal_type = (request.data.get("portal_type") or "student").strip().lower()
+    if portal_type not in ("student", "company"):
+        return Response(
+            {"code": "invalid_portal_type", "detail": "portal_type debe ser student o company"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     input_first_name = (request.data.get("first_name") or "").strip()
     input_last_name = (request.data.get("last_name") or "").strip()
     parsed_first_name, parsed_last_name = _parse_full_name(identity.get("full_name"))
     first_name = input_first_name or identity.get("first_name") or parsed_first_name
     last_name = input_last_name or identity.get("last_name") or parsed_last_name
-    organization_id = request.data.get("organization_id")
     phone = (request.data.get("phone") or "").strip()
-    current_level = (request.data.get("current_level") or "").strip()
-    birth_date = request.data.get("birth_date")
-
-    try:
-        establishment_ids = _parse_establishment_ids(request.data.get("establishment_ids", []))
-    except ValueError as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    username_seed = request.data.get("username") or email.split("@")[0]
 
     with transaction.atomic():
         user = User.objects.filter(email__iexact=email).first()
         created_user = False
         if not user:
-            username_seed = request.data.get("username") or email.split("@")[0]
             user = User.objects.create(
                 username=_generate_unique_username(username_seed),
                 email=email,
@@ -399,46 +589,118 @@ def _auth_sso(provider, request):
             user.set_unusable_password()
             user.save(update_fields=["password"])
             created_user = True
-
-        _assign_student_role(user)
+        else:
+            updated_fields = []
+            if first_name and user.first_name != first_name:
+                user.first_name = first_name
+                updated_fields.append("first_name")
+            if last_name and user.last_name != last_name:
+                user.last_name = last_name
+                updated_fields.append("last_name")
+            if updated_fields:
+                user.save(update_fields=updated_fields)
 
         student_profile = None
-        if organization_id:
+        created_organization = None
+        if portal_type == "student":
+            _assign_student_role(user)
+            organization_id = request.data.get("organization_id")
+            current_level = (request.data.get("current_level") or "").strip()
+            birth_date = request.data.get("birth_date")
             try:
-                organization_id = int(organization_id)
-            except (TypeError, ValueError):
-                return Response(
-                    {"code": "invalid_organization", "detail": "organization_id debe ser numerico"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                establishment_ids = _parse_establishment_ids(request.data.get("establishment_ids", []))
+            except ValueError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-            try:
-                organization = Organization.objects.get(id=organization_id, is_active=True, subscription_enabled=True)
-            except Organization.DoesNotExist:
-                return Response(
-                    {"code": "organization_unavailable", "detail": "La empresa no esta disponible en marketplace"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            if organization_id:
+                try:
+                    organization_id = int(organization_id)
+                except (TypeError, ValueError):
+                    return Response(
+                        {"code": "invalid_organization", "detail": "organization_id debe ser numerico"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
-            student_profile, _ = _upsert_student_profile_for_org(
-                user=user,
-                organization=organization,
-                first_name=first_name,
-                last_name=last_name,
-                email=email,
-                phone=phone,
-                birth_date=birth_date,
-                current_level=current_level,
-                auth_provider=provider,
-                establishment_ids=establishment_ids,
-                source=f"sso_{provider}",
-            )
+                try:
+                    organization = Organization.objects.get(id=organization_id, is_active=True, subscription_enabled=True)
+                except Organization.DoesNotExist:
+                    return Response(
+                        {"code": "organization_unavailable", "detail": "La empresa no esta disponible en marketplace"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                student_profile, _ = _upsert_student_profile_for_org(
+                    user=user,
+                    organization=organization,
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=email,
+                    phone=phone,
+                    birth_date=birth_date,
+                    current_level=current_level,
+                    auth_provider=provider,
+                    establishment_ids=establishment_ids,
+                    source=f"sso_{provider}",
+                )
+        else:
+            organization_name = (request.data.get("organization_name") or request.data.get("company_name") or "").strip()
+            legal_name = (request.data.get("legal_name") or "").strip()
+            subscription_plan_code = request.data.get("subscription_plan")
+            if organization_name:
+                try:
+                    subscription_plan = _get_self_signup_plan(subscription_plan_code)
+                except ValueError as exc:
+                    return Response(
+                        {"code": "invalid_subscription_plan", "detail": str(exc)},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if Organization.objects.filter(name__iexact=organization_name).exists():
+                    return Response(
+                        {"code": "organization_name_taken", "detail": "Ya existe una empresa con este nombre"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                _assign_owner_role(user)
+                created_organization = _create_trial_organization_for_owner(
+                    user=user,
+                    organization_name=organization_name,
+                    legal_name=legal_name,
+                    email=email,
+                    phone=phone,
+                    subscription_plan=subscription_plan,
+                )
+            else:
+                roles = get_user_roles(user)
+                can_access_company = ("owner" in roles) or ("instructor" in roles)
+                if not can_access_company:
+                    return Response(
+                        {"code": "company_access_required", "detail": "Este usuario no tiene acceso al portal empresa"},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
 
     payload = {"tokens": _build_tokens(user), "created_user": created_user}
     payload["identity"] = {"email": email, "provider_user_id": identity.get("provider_user_id")}
     if student_profile:
         payload["student_profile"] = StudentSerializer(student_profile).data
-    return Response(payload, status=status.HTTP_200_OK)
+    if created_organization:
+        payload["organization"] = {
+            "id": created_organization.id,
+            "name": created_organization.name,
+            "subscription_plan": created_organization.subscription_plan,
+            "subscription_status": created_organization.subscription_status,
+            "trial_starts_at": created_organization.trial_starts_at,
+            "trial_ends_at": created_organization.trial_ends_at,
+            "trial_days": subscription_plan.trial_days,
+        }
+        payload["owner"] = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        }
+    return Response(payload, status=status.HTTP_201_CREATED if created_organization else status.HTTP_200_OK)
 
 
 @api_view(["POST"])
@@ -488,6 +750,57 @@ def auth_me(request):
             "portal": portal,
             "owned_organization_ids": owned_org_ids,
             "student_organization_ids": student_org_ids,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def auth_portal_login(request):
+    identifier = (request.data.get("username") or request.data.get("email") or "").strip()
+    password = (request.data.get("password") or "").strip()
+    portal_type = (request.data.get("portal_type") or "").strip().lower()
+
+    if not identifier or not password:
+        return Response({"detail": "usuario o email y password son requeridos"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if portal_type not in ("company", "student", "admin"):
+        return Response({"detail": "portal_type invalido"}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = _authenticate_by_identifier(request, identifier, password)
+    if not user or not user.is_active:
+        return Response({"detail": "Credenciales invalidas"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    roles = get_user_roles(user)
+    can_access_company = ("owner" in roles) or ("instructor" in roles)
+    can_access_student = "alumno" in roles
+    can_access_admin = is_platform_admin(user) or ("admin" in roles)
+
+    if portal_type == "company" and not can_access_company:
+        return Response(
+            {"detail": "Este usuario no tiene acceso al portal empresa"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if portal_type == "student" and not can_access_student:
+        return Response(
+            {"detail": "Este usuario no tiene acceso al portal alumno"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if portal_type == "admin" and not can_access_admin:
+        return Response(
+            {"detail": "Este usuario no tiene acceso al portal administrador"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    tokens = _build_tokens(user)
+    return Response(
+        {
+            "access": tokens["access"],
+            "refresh": tokens["refresh"],
+            "portal_type": portal_type,
+            "roles": roles,
         }
     )
 
@@ -611,3 +924,18 @@ class PlatformSettingViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class PlatformSubscriptionPlanViewSet(viewsets.ModelViewSet):
+    queryset = PlatformSubscriptionPlan.objects.all().order_by("sort_order", "id")
+    serializer_class = PlatformSubscriptionPlanSerializer
+    permission_classes = [IsAdminUser]
+
+    def destroy(self, request, *args, **kwargs):
+        plan = self.get_object()
+        if Organization.objects.filter(subscription_plan=plan.code, subscription_enabled=True).exists():
+            return Response(
+                {"detail": "No se puede eliminar un plan asignado a suscripciones activas"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
