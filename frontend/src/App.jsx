@@ -10,14 +10,10 @@ const DEFAULT_API_URL =
   typeof window !== "undefined"
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : "http://localhost:8000";
-const RUNTIME_CONFIG = typeof window !== "undefined" ? window.__APP_CONFIG__ || {} : {};
-const API_URL = RUNTIME_CONFIG.API_URL || import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 const LOGIN_COVER_IMAGE = import.meta.env.VITE_LOGIN_COVER_IMAGE || "/cover-login.jpg";
 const BRAND_LOGO_DARK = `${import.meta.env.BASE_URL}nila-logo-navy.svg`;
 const BRAND_LOGO_LIGHT = `${import.meta.env.BASE_URL}nila-logo-light.svg`;
 const BRAND_MARK = `${import.meta.env.BASE_URL}nila-mark.svg`;
-const GOOGLE_CLIENT_ID = RUNTIME_CONFIG.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-const FACEBOOK_APP_ID = RUNTIME_CONFIG.FACEBOOK_APP_ID || import.meta.env.VITE_FACEBOOK_APP_ID || "";
 const PATH_LOGIN = "/login";
 const PATH_LOGIN_COMPANY = "/login-empresa";
 const PATH_LOGIN_STUDENT = "/login-alumno";
@@ -66,6 +62,23 @@ const MONTH_OPTIONS = [
   { value: "11", label: "Noviembre" },
   { value: "12", label: "Diciembre" },
 ];
+
+function getRuntimeConfig() {
+  if (typeof window === "undefined") return {};
+  return window.__APP_CONFIG__ || {};
+}
+
+function getApiUrl() {
+  return getRuntimeConfig().API_URL || import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+}
+
+function getGoogleClientId() {
+  return getRuntimeConfig().GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+}
+
+function getFacebookAppId() {
+  return getRuntimeConfig().FACEBOOK_APP_ID || import.meta.env.VITE_FACEBOOK_APP_ID || "";
+}
 
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -1251,8 +1264,8 @@ function App() {
     () => publicSubscriptionPlans.filter((plan) => plan.allow_self_signup && plan.is_active),
     [publicSubscriptionPlans]
   );
-  const effectiveGoogleClientId = publicAuthConfig.google_client_id || GOOGLE_CLIENT_ID;
-  const effectiveFacebookAppId = publicAuthConfig.facebook_app_id || FACEBOOK_APP_ID;
+  const effectiveGoogleClientId = publicAuthConfig.google_client_id || getGoogleClientId();
+  const effectiveFacebookAppId = publicAuthConfig.facebook_app_id || getFacebookAppId();
   const isStudentLoginPortal = loginPortalType === "student";
   const isCompanyLoginPortal = loginPortalType === "company";
   const isAdminLoginPortal = loginPortalType === "admin";
@@ -1599,7 +1612,7 @@ function App() {
   async function request(path, options = {}) {
     const headers = { ...(options.headers || {}) };
     if (token) headers.Authorization = `Bearer ${token}`;
-    return fetch(`${API_URL}${path}`, { ...options, headers });
+    return fetch(`${getApiUrl()}${path}`, { ...options, headers });
   }
 
   async function extractErrorMessage(response, fallback) {
@@ -1612,7 +1625,7 @@ function App() {
   }
 
   async function fetchMe(activeToken) {
-    const response = await fetch(`${API_URL}/api/auth/me/`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/me/`, {
       headers: { Authorization: `Bearer ${activeToken}` },
     });
 
@@ -1628,7 +1641,7 @@ function App() {
   }
 
   async function loadMarketplaceData() {
-    const response = await fetch(`${API_URL}/api/auth/marketplace-organizations/`);
+    const response = await fetch(`${getApiUrl()}/api/auth/marketplace-organizations/`);
     if (!response.ok) return;
     const payload = await response.json();
     setPublicAuthConfig({
@@ -2067,7 +2080,7 @@ function App() {
           : "company";
     let response;
     try {
-      response = await fetch(`${API_URL}/api/auth/portal-login/`, {
+      response = await fetch(`${getApiUrl()}/api/auth/portal-login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, portal_type: portalTypeForLogin }),
@@ -2092,7 +2105,7 @@ function App() {
 
     if (!registerStudentForm.organization_id) return setError("Selecciona una empresa del directorio");
 
-    const response = await fetch(`${API_URL}/api/auth/register-student/`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/register-student/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2124,7 +2137,7 @@ function App() {
     event.preventDefault();
     setError("");
 
-    const response = await fetch(`${API_URL}/api/auth/register-company/`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/register-company/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2198,7 +2211,7 @@ function App() {
         payload.subscription_plan = registerCompanyForm.subscription_plan || undefined;
       }
 
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(`${getApiUrl()}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
