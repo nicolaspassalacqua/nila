@@ -19,6 +19,7 @@ const PATH_LOGIN_COMPANY = "/login-empresa";
 const PATH_LOGIN_STUDENT = "/login-alumno";
 const PATH_DISCOVER = "/descubrir-centros";
 const PATH_DISCOVER_ALIAS = "/descubir-centros";
+const PATH_CENTER_PREFIX = "/centro";
 const PATH_ABOUT = "/quienes-somos";
 const PATH_PRICING = "/precios-planes";
 const PATH_SSO_CALLBACK = "/auth/callback";
@@ -62,6 +63,12 @@ const MONTH_OPTIONS = [
   { value: "11", label: "Noviembre" },
   { value: "12", label: "Diciembre" },
 ];
+const SOCIAL_PLATFORM_META = {
+  facebook: { label: "Facebook", icon: "f", tone: "facebook", reaction: "👍" },
+  instagram: { label: "Instagram", icon: "ig", tone: "instagram", reaction: "❤" },
+  tiktok: { label: "TikTok", icon: "tt", tone: "instagram", reaction: "▶" },
+  linkedin: { label: "LinkedIn", icon: "in", tone: "facebook", reaction: "↗" },
+};
 
 function getRuntimeConfig() {
   if (typeof window === "undefined") return {};
@@ -78,6 +85,40 @@ function getGoogleClientId() {
 
 function getFacebookAppId() {
   return getRuntimeConfig().FACEBOOK_APP_ID || import.meta.env.VITE_FACEBOOK_APP_ID || "";
+}
+
+function normalizeBrandColor(value, fallback = "#191e3b") {
+  if (typeof value !== "string") return fallback;
+  const raw = value.trim();
+  if (!raw.startsWith("#")) return fallback;
+  if (raw.length === 4) {
+    const expanded = raw
+      .slice(1)
+      .split("")
+      .map((char) => `${char}${char}`)
+      .join("");
+    return `#${expanded}`.toLowerCase();
+  }
+  if (raw.length === 7) return raw.toLowerCase();
+  return fallback;
+}
+
+function hexToRgbString(hex) {
+  const normalized = normalizeBrandColor(hex);
+  const parsed = normalized.slice(1);
+  const bigint = Number.parseInt(parsed, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `${r}, ${g}, ${b}`;
+}
+
+function buildBrandVars(color, fallback = "#191e3b") {
+  const normalized = normalizeBrandColor(color, fallback);
+  return {
+    "--entity-brand-color": normalized,
+    "--entity-brand-rgb": hexToRgbString(normalized),
+  };
 }
 
 L.Icon.Default.mergeOptions({
@@ -326,6 +367,13 @@ const ADMIN_PORTAL_TABS = [
   { key: "suscripciones", label: "Suscripciones" },
   { key: "usuarios", label: "Usuarios" },
   { key: "cobros", label: "Cobros" },
+];
+const SOCIAL_MODULE_TABS = [
+  { key: "feed", label: "Feed" },
+  { key: "publicaciones", label: "Publicaciones" },
+  { key: "campanas", label: "Campañas" },
+  { key: "visitantes", label: "Visitantes" },
+  { key: "configuracion", label: "Configuración" },
 ];
 const ACCESSIBILITY_OPTIONS = [
   { key: "screenReader", label: "Lector de pantalla", icon: "SR" },
@@ -593,6 +641,16 @@ function normalizePath(pathname) {
   return pathname.replace(/\/+$/, "") || PATH_LOGIN;
 }
 
+function isCenterProfilePath(pathname) {
+  return normalizePath(pathname).startsWith(`${PATH_CENTER_PREFIX}/`);
+}
+
+function getCenterProfileOrgId(pathname) {
+  const normalized = normalizePath(pathname);
+  if (!normalized.startsWith(`${PATH_CENTER_PREFIX}/`)) return "";
+  return normalized.slice(`${PATH_CENTER_PREFIX}/`.length);
+}
+
 function getPortalByPath(pathname) {
   const normalized = normalizePath(pathname);
   if (normalized === PORTAL_TO_PATH.platform_admin) return "platform_admin";
@@ -678,6 +736,29 @@ function formatDateLabel(value) {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function formatPercentLabel(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return "0%";
+  const rounded = Math.round(numeric * 10) / 10;
+  return `${String(rounded).replace(".0", "")}%`;
+}
+
+function formatSignedPercentLabel(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return "0%";
+  const sign = numeric > 0 ? "+" : "";
+  return `${sign}${formatPercentLabel(numeric)}`;
+}
+
+function getSocialPlatformMeta(platform) {
+  return SOCIAL_PLATFORM_META[normalizeSearchValue(platform)] || {
+    label: String(platform || "Canal"),
+    icon: "•",
+    tone: "facebook",
+    reaction: "•",
+  };
 }
 
 function formatTimeLabel(value) {
@@ -881,6 +962,13 @@ function buildGoogleMapsDirectionsUrl(center, userCoords) {
   return `https://www.google.com/maps/dir/?${query.toString()}`;
 }
 
+function getOrganizationPublicServices(organization) {
+  const enabledModules = Array.isArray(organization?.enabled_modules) ? organization.enabled_modules : [];
+  const labels = OWNER_MODULE_CATALOG.filter((module) => enabledModules.includes(module.key)).map((module) => module.label);
+  if (labels.length) return labels.slice(0, 6);
+  return ["Clases", "Alumnos", "Reservas", "Cobros"];
+}
+
 function haversineDistanceKm(lat1, lon1, lat2, lon2) {
   const toRad = (value) => (value * Math.PI) / 180;
   const earthKm = 6371;
@@ -1066,6 +1154,10 @@ function App() {
   const [studentProfiles, setStudentProfiles] = useState([]);
   const [historyEvents, setHistoryEvents] = useState([]);
   const [marketplaceOrganizations, setMarketplaceOrganizations] = useState([]);
+  const [socialWorkspaceSummary, setSocialWorkspaceSummary] = useState(null);
+  const [socialAccounts, setSocialAccounts] = useState([]);
+  const [socialPosts, setSocialPosts] = useState([]);
+  const [socialCampaigns, setSocialCampaigns] = useState([]);
   const [discoverSearch, setDiscoverSearch] = useState("");
   const [discoverUserCoords, setDiscoverUserCoords] = useState(null);
   const [discoverLocationStatus, setDiscoverLocationStatus] = useState("idle");
@@ -1242,6 +1334,9 @@ function App() {
     }
   });
   const [ownerModule, setOwnerModule] = useState("launcher");
+  const [socialModuleTab, setSocialModuleTab] = useState("feed");
+  const [socialSearch, setSocialSearch] = useState("");
+  const [socialFlowFilter, setSocialFlowFilter] = useState("todos");
   const [adminPortalTab, setAdminPortalTab] = useState("accesos");
   const [companyConfigTab, setCompanyConfigTab] = useState("general");
   const [pendingBranchSetup, setPendingBranchSetup] = useState(false);
@@ -1419,6 +1514,7 @@ function App() {
           organization_id: organization.id,
           organization_name: orgName,
           organization_logo: organization.logo || "",
+          organization_brand_color: organization.brand_color || "",
           organization_plan: organization.subscription_plan || "",
           organization_address: organization.address || "",
           organization_city: organization.city || "",
@@ -1482,6 +1578,16 @@ function App() {
     () => discoverCenters.find((center) => String(center.key) === String(discoverSelectedCenterKey)) || null,
     [discoverCenters, discoverSelectedCenterKey]
   );
+  const centerProfileOrgId = useMemo(() => getCenterProfileOrgId(pathname), [pathname]);
+  const selectedCenterProfileOrganization = useMemo(
+    () => marketplaceOrganizations.find((organization) => String(organization.id) === String(centerProfileOrgId)) || null,
+    [marketplaceOrganizations, centerProfileOrgId]
+  );
+  const selectedCenterProfileOrganizationCenters = useMemo(
+    () =>
+      discoverCenters.filter((center) => String(center.organization_id) === String(centerProfileOrgId)),
+    [discoverCenters, centerProfileOrgId]
+  );
   const selectedBranchForRooms = useMemo(
     () => establishments.find((est) => String(est.id) === String(selectedEstablishmentForRooms)),
     [establishments, selectedEstablishmentForRooms]
@@ -1530,6 +1636,163 @@ function App() {
   );
   const ownerHasOrganization = me?.portal === "owner" && organizations.length >= 1;
   const ownerOrganization = ownerHasOrganization ? organizations[0] : null;
+  const ownerBrandVars = ownerOrganization ? buildBrandVars(ownerOrganization.brand_color || "#191e3b") : buildBrandVars("#191e3b");
+  const ownerSocialAccounts = useMemo(() => {
+    if (socialAccounts.length) {
+      return socialAccounts.map((account) => {
+        const meta = getSocialPlatformMeta(account.platform);
+        return {
+          id: account.id,
+          platform: account.platform_label || meta.label,
+          icon: meta.icon,
+          account_name: account.account_name,
+          handle: account.handle,
+          followers: Number(account.followers_count || 0),
+          engagement: formatPercentLabel(account.engagement_rate),
+          growth: formatSignedPercentLabel(account.growth_rate),
+          tone: meta.tone,
+          is_connected: !!account.is_connected,
+          is_active: !!account.is_active,
+        };
+      });
+    }
+    if (!ownerOrganization) return [];
+    const orgName = ownerOrganization.name || "Tu estudio";
+    const handleBase = normalizeSearchValue(orgName).replace(/[^a-z0-9]/g, "").slice(0, 18) || "nilastudio";
+    return [
+      {
+        id: "facebook",
+        platform: "Facebook",
+        icon: "f",
+        account_name: orgName,
+        handle: handleBase,
+        followers: 1340,
+        engagement: "3.4%",
+        growth: "+12%",
+        tone: "facebook",
+      },
+      {
+        id: "instagram",
+        platform: "Instagram",
+        icon: "ig",
+        account_name: orgName,
+        handle: `${handleBase}_studio`,
+        followers: 21500,
+        engagement: "5.8%",
+        growth: "+21%",
+        tone: "instagram",
+      },
+    ];
+  }, [ownerOrganization, socialAccounts]);
+  const ownerSocialPosts = useMemo(() => {
+    if (socialPosts.length) {
+      return socialPosts.map((post) => {
+        const meta = getSocialPlatformMeta(post.platform);
+        return {
+          id: post.id,
+          platform: post.platform_label || meta.label,
+          platform_key: normalizeSearchValue(post.platform),
+          handle: post.account_handle || "",
+          account_name: post.account_name || ownerOrganization?.name || "Tu estudio",
+          title: post.title,
+          body: post.body,
+          date: formatDateLabel(post.published_at || post.created_at),
+          image_label: post.image_label || "Pieza publicada",
+          likes: Number(post.likes_count || 0),
+          comments: Number(post.comments_count || 0),
+          shares: Number(post.shares_count || 0),
+          views: Number(post.views_count || 0),
+          reaction: meta.reaction,
+        };
+      });
+    }
+    if (!ownerOrganization) return [];
+    const orgName = ownerOrganization.name || "Tu estudio";
+    const common = [
+      {
+        id: "post-1",
+        title: "¿Buscás una práctica más precisa y consciente?",
+        body: "Clases personalizadas, seguimiento del alumno y una experiencia más ordenada para cada reserva.",
+        date: "16/03/2026",
+        image_label: "Publicación destacada",
+      },
+      {
+        id: "post-2",
+        title: "Nuevo bloque de clases de reformer",
+        body: "Abrimos nuevos horarios para alumnos iniciales e intermedios con cupos limitados por sala.",
+        date: "12/03/2026",
+        image_label: "Carrusel de horarios",
+      },
+      {
+        id: "post-3",
+        title: "Tu estudio también puede verse premium",
+        body: "Combina presencia de marca, gestión de alumnos y cobros desde una sola plataforma.",
+        date: "02/03/2026",
+        image_label: "Pieza institucional",
+      },
+    ];
+    return ownerSocialAccounts.flatMap((account, index) =>
+      common.map((post, postIndex) => ({
+        ...post,
+        id: `${account.id}-${post.id}`,
+        platform: account.platform,
+        handle: account.handle,
+        account_name: orgName,
+        likes: index === 0 ? 26 + postIndex * 7 : 55 + postIndex * 12,
+        comments: postIndex,
+        shares: index === 0 ? postIndex : 3 + postIndex,
+        views: 103 + postIndex * 41 + index * 17,
+        reaction: account.platform === "Facebook" ? "👍" : "❤",
+        platform_key: normalizeSearchValue(account.platform),
+      }))
+    );
+  }, [ownerOrganization, ownerSocialAccounts, socialPosts]);
+  const ownerSocialCampaigns = useMemo(() => {
+    if (socialCampaigns.length) {
+      return socialCampaigns.map((campaign) => ({
+        id: campaign.id,
+        name: campaign.name,
+        objective: campaign.objective || "-",
+        status: campaign.status_label || campaign.status,
+        leads: Number(campaign.leads_count || 0),
+        ctr: formatPercentLabel(campaign.ctr),
+        visitors: Number(campaign.visitors_count || 0),
+        budget: `${Number(campaign.budget_amount || 0).toLocaleString("es-AR")} ${campaign.budget_currency || "ARS"}`,
+      }));
+    }
+    return [
+      { id: "fallback-1", name: "Clases introductorias", objective: "Leads", status: "Activa", leads: 14, ctr: "4.8%", visitors: 320, budget: "35.000 ARS" },
+      { id: "fallback-2", name: "Reactivar alumnos inactivos", objective: "Retencion", status: "Activa", leads: 8, ctr: "3.1%", visitors: 180, budget: "12.000 ARS" },
+      { id: "fallback-3", name: "Promocion sede norte", objective: "Trafico", status: "Draft", leads: 0, ctr: "0%", visitors: 0, budget: "22.000 ARS" },
+    ];
+  }, [socialCampaigns]);
+  const filteredOwnerSocialPosts = useMemo(() => {
+    const normalizedSearch = normalizeSearchValue(socialSearch);
+    return ownerSocialPosts.filter((post) => {
+      const matchesFlow = socialFlowFilter === "todos" || normalizeSearchValue(post.platform_key || post.platform) === socialFlowFilter;
+      const matchesSearch =
+        !normalizedSearch ||
+        normalizeSearchValue(`${post.title} ${post.body} ${post.platform} ${post.handle}`).includes(normalizedSearch);
+      return matchesFlow && matchesSearch;
+    });
+  }, [ownerSocialPosts, socialFlowFilter, socialSearch]);
+  const ownerSocialSummary = useMemo(
+    () =>
+      socialWorkspaceSummary || {
+        accounts_connected: ownerSocialAccounts.filter((account) => account.is_connected !== false && account.is_active !== false).length,
+        published_posts: ownerSocialPosts.length,
+        active_campaigns: ownerSocialCampaigns.filter((campaign) => normalizeSearchValue(campaign.status).includes("active") || normalizeSearchValue(campaign.status).includes("activa")).length,
+        followers_total: ownerSocialAccounts.reduce((acc, account) => acc + Number(account.followers || 0), 0),
+        avg_engagement_rate:
+          ownerSocialAccounts.length
+            ? ownerSocialAccounts.reduce((acc, account) => acc + Number(String(account.engagement).replace("%", "") || 0), 0) /
+              ownerSocialAccounts.length
+            : 0,
+        campaign_leads_total: ownerSocialCampaigns.reduce((acc, campaign) => acc + Number(campaign.leads || 0), 0),
+        campaign_visitors_total: ownerSocialCampaigns.reduce((acc, campaign) => acc + Number(campaign.visitors || 0), 0),
+      },
+    [ownerSocialAccounts, ownerSocialCampaigns, ownerSocialPosts, socialWorkspaceSummary]
+  );
   const ownerInstructorProfiles = useMemo(
     () =>
       instructors
@@ -2003,6 +2266,12 @@ function App() {
     navigate(PATH_PRICING);
   }
 
+  function openCenterProfile(organizationId) {
+    setLoginModalOpen(false);
+    if (!organizationId) return;
+    navigate(`${PATH_CENTER_PREFIX}/${organizationId}`);
+  }
+
   function openMarketplaceSignupForOrganization(organizationId) {
     navigate(PATH_LOGIN_STUDENT, true);
     setLoginPortalType("student");
@@ -2374,6 +2643,24 @@ function App() {
     }
   }
 
+  async function loadOwnerSocialWorkspace(organizationId = "") {
+    const query = organizationId ? `?organization_id=${organizationId}` : "";
+    const response = await request(`/api/social/workspace/${query}`);
+    if (!response.ok) {
+      setSocialWorkspaceSummary(null);
+      setSocialAccounts([]);
+      setSocialPosts([]);
+      setSocialCampaigns([]);
+      return;
+    }
+
+    const payload = await response.json();
+    setSocialWorkspaceSummary(payload.summary || null);
+    setSocialAccounts(Array.isArray(payload.accounts) ? payload.accounts : []);
+    setSocialPosts(Array.isArray(payload.posts) ? payload.posts : []);
+    setSocialCampaigns(Array.isArray(payload.campaigns) ? payload.campaigns : []);
+  }
+
   async function loadOwnerData() {
     const [
       summaryRes,
@@ -2387,6 +2674,7 @@ function App() {
       paymentsRes,
       invoicesRes,
       plansRes,
+      socialRes,
     ] = await Promise.all([
       request("/api/dashboard/summary/"),
       request("/api/organizations/"),
@@ -2399,6 +2687,7 @@ function App() {
       request("/api/payments/"),
       request("/api/invoices/"),
       request("/api/membership-plans/"),
+      request("/api/social/workspace/"),
     ]);
 
     if (summaryRes.ok) setSummary(await summaryRes.json());
@@ -2412,6 +2701,18 @@ function App() {
     if (paymentsRes.ok) setPayments(await paymentsRes.json());
     if (invoicesRes.ok) setInvoices(await invoicesRes.json());
     if (plansRes.ok) setMembershipPlans(await plansRes.json());
+    if (socialRes.ok) {
+      const payload = await socialRes.json();
+      setSocialWorkspaceSummary(payload.summary || null);
+      setSocialAccounts(Array.isArray(payload.accounts) ? payload.accounts : []);
+      setSocialPosts(Array.isArray(payload.posts) ? payload.posts : []);
+      setSocialCampaigns(Array.isArray(payload.campaigns) ? payload.campaigns : []);
+    } else {
+      setSocialWorkspaceSummary(null);
+      setSocialAccounts([]);
+      setSocialPosts([]);
+      setSocialCampaigns([]);
+    }
     loadMarketplaceData();
   }
 
@@ -4326,7 +4627,7 @@ function App() {
   useEffect(() => {
     if (!token) return;
     if (!me) return;
-    if (isDiscoverPath(pathname) || isAboutPath(pathname) || isPricingPath(pathname) || isSSOCallbackPath(pathname)) return;
+    if (isDiscoverPath(pathname) || isCenterProfilePath(pathname) || isAboutPath(pathname) || isPricingPath(pathname) || isSSOCallbackPath(pathname)) return;
 
     const activePortal = getPortalByPath(pathname);
     if (!activePortal) return;
@@ -4357,7 +4658,7 @@ function App() {
 
   const helpContextKey = useMemo(() => {
     if (isSSOCallbackPath(pathname)) return "sso";
-    if (isDiscoverPath(pathname)) return "discover";
+    if (isDiscoverPath(pathname) || isCenterProfilePath(pathname)) return "discover";
     if (isAboutPath(pathname)) return "about";
     if (isPricingPath(pathname)) return "pricing";
 
@@ -4527,11 +4828,23 @@ function App() {
               onSelectCenter={setDiscoverSelectedCenterKey}
             />
             {selectedDiscoverCenter ? (
-              <div className="discover-map-selected">
+              <div className="discover-map-selected discover-map-selected-branded" style={buildBrandVars(selectedDiscoverCenter.organization_brand_color)}>
+                <div className="discover-brand-signature">
+                  <span className="discover-brand-mark">
+                    {selectedDiscoverCenter.organization_logo ? (
+                      <img src={selectedDiscoverCenter.organization_logo} alt={selectedDiscoverCenter.organization_name} />
+                    ) : (
+                      (selectedDiscoverCenter.organization_name || "N").slice(0, 1).toUpperCase()
+                    )}
+                  </span>
+                  <span className="discover-brand-label">{selectedDiscoverCenter.organization_name}</span>
+                </div>
                 <h4>{selectedDiscoverCenter.name}</h4>
-                <p className="discover-org-name">{selectedDiscoverCenter.organization_name}</p>
                 <p className="discover-address">{getCenterAddressLabel(selectedDiscoverCenter)}</p>
                 <div className="discover-map-actions">
+                  <button type="button" className="map-link-btn secondary" onClick={() => openCenterProfile(selectedDiscoverCenter.organization_id)}>
+                    Ver estudio
+                  </button>
                   <a
                     href={buildGoogleMapsDirectionsUrl(selectedDiscoverCenter, discoverUserCoords)}
                     target="_blank"
@@ -4568,23 +4881,38 @@ function App() {
                 return (
                   <article
                     key={`discover-center-${center.key}`}
-                    className={`discover-center-card${isSelected ? " selected" : ""}`}
+                    className={`discover-center-card discover-center-card-branded${isSelected ? " selected" : ""}`}
+                    style={buildBrandVars(center.organization_brand_color)}
                   >
                     <div className="discover-center-head">
-                      <h3>{center.name}</h3>
+                      <div>
+                        <div className="discover-brand-signature">
+                          <span className="discover-brand-mark">
+                            {center.organization_logo ? (
+                              <img src={center.organization_logo} alt={center.organization_name} />
+                            ) : (
+                              (center.organization_name || "N").slice(0, 1).toUpperCase()
+                            )}
+                          </span>
+                          <span className="discover-brand-label">{center.organization_name}</span>
+                        </div>
+                        <h3>{center.name}</h3>
+                      </div>
                       {Number.isFinite(center.distanceKm) ? (
                         <span className="distance-pill">{formatDistanceLabel(center.distanceKm)}</span>
                       ) : (
                         <span className="distance-pill muted">Sin distancia</span>
                       )}
                     </div>
-                    <p className="discover-org-name">{center.organization_name}</p>
                     <p className="discover-address">{getCenterAddressLabel(center)}</p>
                     <p className="discover-schedule">{scheduleSummary.openText}</p>
                     {scheduleSummary.closedText ? <p className="discover-schedule">{scheduleSummary.closedText}</p> : null}
                     <div className="discover-card-actions discover-card-actions--split">
                       <button type="button" className="discover-map-btn" onClick={() => setDiscoverSelectedCenterKey(String(center.key))}>
                         Ver en mapa
+                      </button>
+                      <button type="button" className="discover-map-btn" onClick={() => openCenterProfile(center.organization_id)}>
+                        Ver estudio
                       </button>
                       <button type="button" onClick={() => openMarketplaceSignupForOrganization(center.organization_id)}>
                         Registrarme
@@ -4600,6 +4928,156 @@ function App() {
     </section>
   );
 
+  const renderCenterProfile = (
+    <section className="marketing-login discover-page">
+      {renderPublicHeader("discover")}
+
+      <main className="discover-shell">
+        {!selectedCenterProfileOrganization ? (
+          <section className="discover-hero-card">
+            <p className="eyebrow">Marketplace</p>
+            <h1>Estudio no encontrado</h1>
+            <p>No pudimos encontrar la ficha publica de este estudio. Vuelve al directorio y elige otro centro.</p>
+            <div className="hero-actions">
+              <button type="button" className="hero-primary-btn" onClick={openFindCenter}>
+                Volver al directorio
+              </button>
+            </div>
+          </section>
+        ) : (
+          <>
+            <section className="center-profile-hero" style={buildBrandVars(selectedCenterProfileOrganization.brand_color)}>
+              <div className="center-profile-hero-copy">
+                <p className="eyebrow">Estudio destacado</p>
+                <div className="center-profile-brand-row">
+                  <span className="center-profile-brand-mark">
+                    {selectedCenterProfileOrganization.logo ? (
+                      <img src={selectedCenterProfileOrganization.logo} alt={selectedCenterProfileOrganization.name} />
+                    ) : (
+                      String(selectedCenterProfileOrganization.name || "N").slice(0, 1).toUpperCase()
+                    )}
+                  </span>
+                  <div>
+                    <h1>{selectedCenterProfileOrganization.name}</h1>
+                    <p>{selectedCenterProfileOrganization.legal_name || "Estudio de pilates en NILA"}</p>
+                  </div>
+                </div>
+                <p className="center-profile-summary">
+                  Una ficha publica pensada para mostrar identidad, sedes activas, servicios ofrecidos y una experiencia de marca mas cuidada.
+                </p>
+                <div className="center-profile-actions">
+                  <button type="button" className="hero-primary-btn" onClick={() => openMarketplaceSignupForOrganization(selectedCenterProfileOrganization.id)}>
+                    Registrarme en este estudio
+                  </button>
+                  <button type="button" className="hero-secondary-btn" onClick={openFindCenter}>
+                    Volver al directorio
+                  </button>
+                </div>
+              </div>
+              <aside className="center-profile-aside">
+                <article>
+                  <span>Sedes visibles</span>
+                  <strong>{selectedCenterProfileOrganizationCenters.length || 1}</strong>
+                </article>
+                <article>
+                  <span>Plan</span>
+                  <strong>{selectedCenterProfileOrganization.subscription_plan || "Activo"}</strong>
+                </article>
+                <article>
+                  <span>Ubicacion base</span>
+                  <strong>{selectedCenterProfileOrganization.city || "Argentina"}</strong>
+                </article>
+              </aside>
+            </section>
+
+            <section className="center-profile-grid">
+              <article className="center-profile-card">
+                <h3>Servicios y experiencia</h3>
+                <p className="center-profile-copy">
+                  El estudio puede destacar aqui su propuesta, el tipo de clases que ofrece y los modulos que soportan su operacion.
+                </p>
+                <div className="center-profile-service-list">
+                  {getOrganizationPublicServices(selectedCenterProfileOrganization).map((service) => (
+                    <span key={`${selectedCenterProfileOrganization.id}-${service}`} className="center-profile-service-pill">
+                      {service}
+                    </span>
+                  ))}
+                </div>
+              </article>
+
+              <article className="center-profile-card">
+                <h3>Informacion de contacto</h3>
+                <div className="center-profile-detail-list">
+                  <div>
+                    <span>Direccion</span>
+                    <strong>{selectedCenterProfileOrganization.address || "No declarada"}</strong>
+                  </div>
+                  <div>
+                    <span>Telefono</span>
+                    <strong>{selectedCenterProfileOrganization.phone || "No declarado"}</strong>
+                  </div>
+                  <div>
+                    <span>Email</span>
+                    <strong>{selectedCenterProfileOrganization.email || "No declarado"}</strong>
+                  </div>
+                  <div>
+                    <span>Sitio web</span>
+                    <strong>{selectedCenterProfileOrganization.website_url || "No declarado"}</strong>
+                  </div>
+                </div>
+              </article>
+            </section>
+
+            <section className="center-profile-branches">
+              <div className="center-profile-section-head">
+                <div>
+                  <p className="eyebrow">Sucursales</p>
+                  <h3>Espacios disponibles</h3>
+                </div>
+                <p className="center-profile-copy">Cada sede puede tener su propia operacion, direccion y acceso desde mapa.</p>
+              </div>
+              <div className="center-profile-branch-grid">
+                {selectedCenterProfileOrganizationCenters.map((center) => {
+                  const scheduleSummary = formatWeeklyHoursCompact(center);
+                  return (
+                    <article
+                      key={`profile-branch-${center.key}`}
+                      className="center-profile-branch-card"
+                      style={buildBrandVars(center.organization_brand_color)}
+                    >
+                      <div className="discover-brand-signature">
+                        <span className="discover-brand-mark">
+                          {center.organization_logo ? (
+                            <img src={center.organization_logo} alt={center.organization_name} />
+                          ) : (
+                            String(center.organization_name || "N").slice(0, 1).toUpperCase()
+                          )}
+                        </span>
+                        <span className="discover-brand-label">{center.organization_name}</span>
+                      </div>
+                      <h4>{center.name}</h4>
+                      <p>{getCenterAddressLabel(center)}</p>
+                      <p>{scheduleSummary.openText}</p>
+                      {scheduleSummary.closedText ? <p>{scheduleSummary.closedText}</p> : null}
+                      <div className="center-profile-branch-actions">
+                        <button type="button" className="discover-map-btn" onClick={() => openMarketplaceSignupForOrganization(center.organization_id)}>
+                          Registrarme
+                        </button>
+                        <a href={buildGoogleMapsPlaceUrl(center)} target="_blank" rel="noreferrer" className="map-link-btn secondary">
+                          Ver en mapa
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          </>
+        )}
+      </main>
+    </section>
+  );
+
   const renderAbout = (
     <section className="marketing-login discover-page">
       {renderPublicHeader("about")}
@@ -4608,8 +5086,8 @@ function App() {
           <p className="eyebrow">NILA</p>
           <h1>Quienes somos</h1>
           <p>
-            Somos una plataforma para estudios de pilates que conecta duenos, instructores y alumnos en una experiencia
-            digital unificada: gestion operativa, pagos, clases y directorio de centros.
+            Somos una plataforma para estudios de pilates que conecta operacion, experiencia del alumno y presencia de marca
+            en una sola capa digital.
           </p>
         </section>
 
@@ -4638,7 +5116,7 @@ function App() {
         <section className="discover-hero-card">
           <p className="eyebrow">Planes</p>
           <h1>Precios y planes</h1>
-          <p>Elige el plan segun el nivel de gestion que necesita tu estudio.</p>
+          <p>Elige el plan segun la etapa de tu estudio y profesionaliza operacion, alumnos, cobros y presencia comercial.</p>
         </section>
 
         <section className="pricing-grid">
@@ -4688,9 +5166,9 @@ function App() {
         <div className="hero-layout">
           <div className="hero-copy">
             <p className="hero-kicker">Plataforma para estudios de pilates</p>
-            <h1>Gestion integral para estudios, duenos y alumnos</h1>
+            <h1>Gestion premium para estudios de pilates</h1>
             <p className="hero-description">
-              Administra sedes, clases, alumnos y cobros desde una sola plataforma.
+              Ordena tu operacion, eleva la experiencia de tus alumnos y presenta tu estudio con una imagen mas profesional.
             </p>
             <div className="hero-actions">
               <button type="button" className="hero-primary-btn" onClick={openCompanyLogin}>
@@ -4708,7 +5186,7 @@ function App() {
           </div>
 
           <aside className="hero-side-card">
-            <h3>Ingresa a NILA</h3>
+            <h3>Accede a tu espacio</h3>
             <button type="button" className="hero-side-action" onClick={openCompanyLogin}>
               Empresas
             </button>
@@ -4723,8 +5201,8 @@ function App() {
             </button>
             <div className="hero-side-metrics">
               <article>
-                <strong>24/7</strong>
-                <span>Reservas online</span>
+                <strong>Marca + operacion</strong>
+                <span>Gestion y presencia digital en una sola plataforma</span>
               </article>
             </div>
           </aside>
@@ -4734,15 +5212,15 @@ function App() {
       <section className="landing-value-strip">
         <article className="value-tile">
           <h4>Para empresas</h4>
-          <p>Configuracion de empresa, sedes, salones, facturacion y suscripciones.</p>
+          <p>Configuracion del estudio, sedes, salones, cobros y presencia comercial.</p>
         </article>
         <article className="value-tile">
           <h4>Para alumnos</h4>
-          <p>Registro desde el directorio, reservas, pagos e ingreso con Google o Facebook.</p>
+          <p>Registro desde el directorio, reservas, pagos, QR de asistencia e ingreso simple.</p>
         </article>
         <article className="value-tile">
           <h4>Directorio</h4>
-          <p>Busqueda de centros y alta guiada en una experiencia unificada.</p>
+          <p>Descubrimiento de estudios con identidad propia, servicios y reputacion visible.</p>
         </article>
       </section>
 
@@ -5758,11 +6236,12 @@ function App() {
 
   const renderOwnerPortal = (
     <main className="portal-shell">
-      <header className="portal-header">
+      <header className="portal-header portal-header-branded" style={ownerBrandVars}>
         <div>
           <BrandLogo className="portal-brand-logo" />
           <h1>Portal Dueño de Local</h1>
-          <p>Gestion de organizacion, sedes y alumnos.</p>
+          <p>Gestion de organizacion, sedes, alumnos y presencia comercial.</p>
+          {ownerOrganization?.name ? <span className="portal-brand-chip">{ownerOrganization.name}</span> : null}
         </div>
         {ownerIsTrialing ? (
           <div className="trial-banner">
@@ -7779,9 +8258,205 @@ function App() {
         ) : null}
 
         {ownerModule === "redes_sociales" ? (
-          <div className="panel-card">
-            <h3>Redes sociales</h3>
-            <p>Conectar cuentas, analizar feed de publicaciones y publicar desde un unico espacio.</p>
+          <div className="social-odoo-shell">
+            <section className="social-odoo-header">
+              <div className="social-odoo-brand">
+                <span className="social-odoo-mark">❤</span>
+                <div>
+                  <h3>Redes sociales</h3>
+                  <p>Conecta cuentas, analiza rendimiento y publica desde un unico espacio.</p>
+                </div>
+              </div>
+              <nav className="social-odoo-tabs" aria-label="Secciones del modulo social">
+                {SOCIAL_MODULE_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={`social-odoo-tab ${socialModuleTab === tab.key ? "active" : ""}`}
+                    onClick={() => setSocialModuleTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </section>
+
+            <section className="social-odoo-toolbar">
+              <div className="social-odoo-actions">
+                <button type="button" onClick={() => setSocialModuleTab("configuracion")}>Agregar un flujo</button>
+                <button type="button" onClick={() => setSocialModuleTab("publicaciones")}>Nueva publicación</button>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => loadOwnerSocialWorkspace(ownerOrganization?.id || "")}
+                >
+                  Sincronizar
+                </button>
+              </div>
+              <div className="social-odoo-filters">
+                <span className="social-odoo-chip">Mis flujos</span>
+                <select value={socialFlowFilter} onChange={(event) => setSocialFlowFilter(event.target.value)}>
+                  <option value="todos">Por flujo</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="instagram">Instagram</option>
+                </select>
+                <input
+                  value={socialSearch}
+                  onChange={(event) => setSocialSearch(event.target.value)}
+                  placeholder="Buscar publicaciones, cuentas o temas"
+                />
+              </div>
+            </section>
+
+            <section className="social-odoo-account-strip">
+              {ownerSocialAccounts.map((account) => (
+                <article key={account.id} className={`social-account-card ${account.tone}`}>
+                  <div className="social-account-head">
+                    <span className="social-account-icon">{account.icon}</span>
+                    <div>
+                      <strong>{account.account_name}</strong>
+                      <span>{account.platform}</span>
+                    </div>
+                  </div>
+                  <div className="social-account-metrics">
+                    <span>{account.followers.toLocaleString("es-AR")} seguidores</span>
+                    <strong>{account.growth}</strong>
+                    <small>{account.engagement} engagement</small>
+                  </div>
+                </article>
+              ))}
+            </section>
+
+            {socialModuleTab === "feed" || socialModuleTab === "publicaciones" ? (
+              <section className="social-feed-layout">
+                <div className="social-feed-column">
+                  <div className="social-feed-column-head">
+                    <h4>Publicaciones en Facebook</h4>
+                    <span>{filteredOwnerSocialPosts.filter((post) => post.platform === "Facebook").length}</span>
+                  </div>
+                  <div className="social-feed-list">
+                    {filteredOwnerSocialPosts.filter((post) => post.platform === "Facebook").map((post) => (
+                      <article key={post.id} className="social-post-card">
+                        <div className="social-post-head">
+                          <div>
+                            <strong>{post.account_name}</strong>
+                            <span>{post.handle}</span>
+                          </div>
+                          <small>{post.date}</small>
+                        </div>
+                        <p className="social-post-title">{post.title}</p>
+                        <p className="social-post-body">{post.body}</p>
+                        <div className="social-post-image">{post.image_label}</div>
+                        <div className="social-post-meta">
+                          <span>{post.reaction || "👍"} {post.likes}</span>
+                          <span>💬 {post.comments}</span>
+                          <span>↗ {post.shares}</span>
+                          <span>👁 {post.views}</span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+                <div className="social-feed-column">
+                  <div className="social-feed-column-head">
+                    <h4>Publicaciones en Instagram</h4>
+                    <span>{filteredOwnerSocialPosts.filter((post) => post.platform === "Instagram").length}</span>
+                  </div>
+                  <div className="social-feed-list">
+                    {filteredOwnerSocialPosts.filter((post) => post.platform === "Instagram").map((post) => (
+                      <article key={post.id} className="social-post-card">
+                        <div className="social-post-head">
+                          <div>
+                            <strong>{post.account_name}</strong>
+                            <span>{post.handle}</span>
+                          </div>
+                          <small>{post.date}</small>
+                        </div>
+                        <p className="social-post-title">{post.title}</p>
+                        <p className="social-post-body">{post.body}</p>
+                        <div className="social-post-image">{post.image_label}</div>
+                        <div className="social-post-meta">
+                          <span>{post.reaction || "❤"} {post.likes}</span>
+                          <span>💬 {post.comments}</span>
+                          <span>↗ {post.shares}</span>
+                          <span>👁 {post.views}</span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {socialModuleTab === "campanas" ? (
+              <section className="social-side-grid">
+                <article className="panel-card">
+                  <h3>Campañas</h3>
+                  <p className="panel-card-subline">Segmenta campañas por sede, servicio y estacionalidad.</p>
+                  <div className="social-summary-grid">
+                    <article><span>Activas</span><strong>{ownerSocialSummary.active_campaigns}</strong></article>
+                    <article><span>CTR promedio</span><strong>{formatPercentLabel(ownerSocialCampaigns.reduce((acc, campaign) => acc + Number(String(campaign.ctr).replace("%", "") || 0), 0) / Math.max(ownerSocialCampaigns.length, 1))}</strong></article>
+                    <article><span>Leads del mes</span><strong>{ownerSocialSummary.campaign_leads_total}</strong></article>
+                  </div>
+                </article>
+                <article className="panel-card">
+                  <h3>Próximas acciones</h3>
+                  <ul className="list-clean social-checklist">
+                    {ownerSocialCampaigns.map((campaign) => (
+                      <li key={campaign.id}>
+                        {campaign.name}: {campaign.objective} | {campaign.leads} leads | CTR {campaign.ctr}
+                      </li>
+                    ))}
+                  </ul>
+                </article>
+              </section>
+            ) : null}
+
+            {socialModuleTab === "visitantes" ? (
+              <section className="social-side-grid">
+                <article className="panel-card">
+                  <h3>Visitantes y conversión</h3>
+                  <div className="social-summary-grid">
+                    <article><span>Visitas al perfil</span><strong>{Number(ownerSocialSummary.campaign_visitors_total || 0).toLocaleString("es-AR")}</strong></article>
+                    <article><span>Seguidores totales</span><strong>{Number(ownerSocialSummary.followers_total || 0).toLocaleString("es-AR")}</strong></article>
+                    <article><span>Engagement promedio</span><strong>{formatPercentLabel(ownerSocialSummary.avg_engagement_rate)}</strong></article>
+                  </div>
+                </article>
+                <article className="panel-card">
+                  <h3>Origen principal</h3>
+                  <p className="panel-card-subline">
+                    {ownerSocialAccounts.length
+                      ? `${ownerSocialAccounts[0].platform} y el marketplace estan liderando el trafico actual.`
+                      : "Activa al menos una cuenta para ver el origen principal del trafico."}
+                  </p>
+                </article>
+              </section>
+            ) : null}
+
+            {socialModuleTab === "configuracion" ? (
+              <section className="social-side-grid">
+                <article className="panel-card">
+                  <h3>Conexiones</h3>
+                  {ownerSocialAccounts.map((account) => (
+                    <label key={`toggle-${account.id}`} className="toggle-row">
+                      <span>{account.platform} conectado</span>
+                      <input type="checkbox" checked={account.is_connected !== false && account.is_active !== false} readOnly />
+                    </label>
+                  ))}
+                  <label className="toggle-row">
+                    <span>Publicación automática</span>
+                    <input type="checkbox" readOnly />
+                  </label>
+                </article>
+                <article className="panel-card">
+                  <h3>Línea editorial</h3>
+                  <p className="panel-card-subline">
+                    Define tono, frecuencia y objetivos por canal para mantener consistencia de marca.
+                    Hoy tienes {ownerSocialSummary.accounts_connected} cuentas conectadas y {ownerSocialSummary.published_posts} publicaciones visibles.
+                  </p>
+                </article>
+              </section>
+            ) : null}
           </div>
         ) : null}
 
@@ -8017,6 +8692,8 @@ function App() {
         ? renderSSOCallback
         : isDiscoverPath(pathname)
           ? renderDiscoverCenters
+        : isCenterProfilePath(pathname)
+          ? renderCenterProfile
         : isAboutPath(pathname)
           ? renderAbout
         : isPricingPath(pathname)

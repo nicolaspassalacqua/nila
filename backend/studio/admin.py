@@ -13,6 +13,9 @@ from .models import (
     PlatformSetting,
     PlatformSubscriptionPlan,
     Room,
+    SocialAccount,
+    SocialCampaign,
+    SocialPost,
     StudioClass,
     Student,
     StudentHistory,
@@ -119,6 +122,56 @@ class InvoiceAdmin(admin.ModelAdmin):
     list_display = ("id", "organization", "payment", "status", "invoice_number", "cae", "emitted_at")
     list_filter = ("organization", "status", "voucher_type")
     search_fields = ("invoice_number", "cae")
+
+
+@admin.register(SocialAccount)
+class SocialAccountAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "organization",
+        "platform",
+        "account_name",
+        "handle",
+        "followers_count",
+        "is_connected",
+        "is_active",
+    )
+    list_filter = ("organization", "platform", "is_connected", "is_active")
+    search_fields = ("organization__name", "account_name", "handle")
+
+
+@admin.register(SocialPost)
+class SocialPostAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "organization",
+        "platform",
+        "title",
+        "status",
+        "published_at",
+        "likes_count",
+        "comments_count",
+        "views_count",
+    )
+    list_filter = ("organization", "platform", "status")
+    search_fields = ("organization__name", "title", "body", "account__handle")
+
+
+@admin.register(SocialCampaign)
+class SocialCampaignAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "organization",
+        "name",
+        "objective",
+        "status",
+        "leads_count",
+        "visitors_count",
+        "budget_amount",
+        "budget_currency",
+    )
+    list_filter = ("organization", "status", "budget_currency")
+    search_fields = ("organization__name", "name", "objective")
 
 
 @admin.register(UserProfile)

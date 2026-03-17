@@ -1,7 +1,7 @@
 ﻿# NILA - Plataforma Inteligente para Estudios de Pilates
 
 Documento de Requerimientos Funcionales y No Funcionales (FRD + NFR)
-Version: `4.1`
+Version: `4.3`
 Autor: `Nicolas Passalacqua`
 Fecha: `2026-03-16`
 
@@ -90,6 +90,8 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-071A | Registro self-service marketplace | Alumno crea cuenta y se asocia a empresa | Alumno | Alta |
 | FR-071B | Alumno multi-empresa | Un mismo usuario alumno puede asociarse a varias empresas | Sistema | Alta |
 | FR-071C | SSO de alumno | Alta/login de alumno via Google/Facebook segun policy global | Alumno / Sistema | Alta |
+| FR-071D | Check-in por QR en establecimiento | El alumno presenta/escanea su codigo QR al ingresar y el sistema registra asistencia con fecha, hora y sede | Alumno / Sistema | Alta |
+| FR-071E | Puntuacion de establecimientos o sucursales | Alumno puede calificar la experiencia del centro o sucursal donde toma servicios | Alumno | Media |
 
 ## 5.5 Clases
 | ID | Requerimiento | Descripcion | Actor | Prioridad |
@@ -118,6 +120,7 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-026 | Registro automatico de pagos | Actualizar estado por webhook/manual | Sistema | Alta |
 | FR-027 | Historial de pagos | Visualizar pagos por perfil | Admin / Owner / Alumno | Alta |
 | FR-027A | Facturacion electronica (ARCA) | Emision de comprobantes sobre pagos aprobados | Sistema | Alta |
+| FR-027B | Pago en efectivo de suscripciones de alumnos | Registrar y gestionar pagos de membresias/suscripciones de alumnos cobrados en efectivo en el establecimiento | Owner / Sistema | Alta |
 | FR-084 | Cobro de suscripcion de plataforma | Generar solicitud de pago owner por plan de NILA | Owner | Alta |
 | FR-085 | Trial de plataforma visible | Mostrar estado y tiempo restante del trial en portal owner | Sistema | Alta |
 
@@ -126,6 +129,8 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 |---|---|---|---|---|
 | FR-086 | Configurar planes para clientes | Owner define planes comerciales para sus alumnos | Owner | Alta |
 | FR-087 | Exponer atributos del plan comercial | Precio, moneda, vigencia, descripcion y clases por semana | Owner | Alta |
+| FR-089 | Configurar paleta visual del marketplace | Owner define colores de marca aplicables a su presencia publica en marketplace | Owner | Media |
+| FR-090 | Pagina de marca y servicios del establecimiento | Owner administra una pagina publica con branding, propuesta comercial y servicios ofrecidos | Owner | Alta |
 
 ## 5.9 Marketplace publico y marketing
 | ID | Requerimiento | Descripcion | Actor | Prioridad |
@@ -137,6 +142,8 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-075 | Seccion Quienes somos | Landing publica informativa | Publico | Media |
 | FR-076 | Seccion Precios y planes | Landing publica comercial | Publico | Media |
 | FR-088 | Publicacion de planes de plataforma | Mostrar en web solo planes activos/publicos definidos por admin | Sistema / Publico | Alta |
+| FR-091 | Branding publico por establecimiento | El marketplace refleja colores, imagenes y contenido comercial definidos por cada owner | Sistema / Publico | Media |
+| FR-092 | Visibilidad publica de reputacion | Mostrar puntuacion promedio y volumen de calificaciones de establecimientos o sucursales | Sistema / Publico | Media |
 
 ## 6. Requerimientos no funcionales (NFR)
 
@@ -178,11 +185,15 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 - Un owner solo puede crear una empresa.
 - Solo admin puede modificar habilitaciones globales de plataforma (SSO, modulos por plan, suscripciones).
 - Un alumno puede pertenecer a multiples organizaciones.
+- La asistencia del alumno puede registrarse mediante codigo QR al ingresar al establecimiento.
+- Cada owner puede personalizar la presencia publica de su empresa con paleta visual, branding y servicios ofrecidos.
+- Las calificaciones de alumnos se registran por establecimiento o sucursal y deben quedar asociadas a una experiencia real del centro.
 - Razon social se bloquea cuando existe emision fiscal.
 - Capacidad de clase no puede superar capacidad de salon.
 - Salon bloqueado o con conflicto horario no se puede asignar a clase.
 - Un plan de plataforma puede ser visible en web sin permitir alta autogestionada.
 - La liquidacion de instructores depende del esquema economico configurado por empresa.
+- Las suscripciones de alumnos pueden abonarse por medios digitales o en efectivo segun la operacion del establecimiento.
 
 ## 8. Integraciones y dependencias
 - Autenticacion social: Google OAuth (token validation) y Facebook Graph API.
@@ -198,7 +209,104 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 - Infra: Docker Compose, ECR, ECS/Fargate, EC2.
 - Repositorio: GitHub.
 
-## 10. Criterio de cierre (Definition of Done documental)
+## 10. Brand System NILA
+
+### 10.1 Nucleo de marca
+- Marca: `NILA`
+- Descriptor: `Gestion premium para estudios de pilates`
+- Idea central: ordenar la operacion del estudio y elevar su imagen comercial.
+
+### 10.2 Posicionamiento
+`NILA es la plataforma premium de gestion para estudios de pilates que combina operacion, experiencia y crecimiento comercial.`
+
+Version corta:
+`NILA, gestion premium para estudios de pilates.`
+
+### 10.3 Atributos de marca
+- premium
+- serena
+- precisa
+- profesional
+- contemporanea
+- confiable
+
+### 10.4 Sistema verbal
+- Tagline principal: `Gestion premium para estudios de pilates`
+- Tagline alternativo: `Operacion, alumnos y cobros en una sola plataforma`
+- Propuesta corta: `NILA ayuda a estudios de pilates a gestionar mejor su negocio y su presencia digital.`
+
+### 10.5 Paleta visual
+Colores primarios:
+- `Navy Deep` `#191E3B`
+- `Ivory Mist` `#F7F4EE`
+
+Colores secundarios:
+- `Slate` `#647089`
+- `Cloud` `#E9EDF3`
+
+Acentos:
+- `Champagne` `#C8A97E`
+- `Soft Sage` `#9FB7A3`
+
+Estados de interfaz:
+- `Success` `#2F7D62`
+- `Warning` `#B9852A`
+- `Error` `#B24A4A`
+
+### 10.6 Tipografia
+Editorial / marca:
+- `Cormorant Garamond`
+
+Producto / UI:
+- `Manrope`
+
+Fallbacks:
+- `Georgia`
+- `system-ui, sans-serif`
+
+### 10.7 Direccion visual
+La marca debe transmitir:
+- lujo sobrio
+- bienestar moderno
+- tecnologia silenciosa
+- claridad operativa
+
+Principios de aplicacion:
+- mucho aire visual
+- pocos colores bien usados
+- interfaces limpias y jerarquicas
+- imagenes aspiracionales sin verse artificiales
+
+### 10.8 Iconografia y componentes
+Iconografia:
+- linea fina
+- geometria simple
+- consistencia de trazo
+
+Componentes:
+- boton primario oscuro con contraste alto
+- cards claras con borde suave y sombra contenida
+- inputs limpios con foco sobrio
+- badges discretos para estados
+
+### 10.9 Tono de voz
+La comunicacion de NILA debe ser:
+- clara
+- breve
+- segura
+- elegante
+- comercial sin exageracion
+
+### 10.10 Aplicaciones prioritarias
+La identidad debe reflejarse primero en:
+1. Landing publica
+2. Header y hero principal
+3. Login y registro
+4. Portal owner
+5. Marketplace y fichas de estudios
+6. Emails y mensajes transaccionales
+
+## 11. Criterio de cierre (Definition of Done documental)
 Se considera cubierta la documentacion base cuando existen y estan actualizados:
 - `docs/documento-tecnico.md`
 - `docs/manual-desarrollador.md`

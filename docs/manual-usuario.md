@@ -1,5 +1,5 @@
 ﻿# Manual de Usuario - NILA
-Version: `1.1`
+Version: `1.2`
 Fecha: `2026-03-16`
 
 ## 1. Introduccion
@@ -87,6 +87,8 @@ Funciones principales:
 - Liquidacion mensual de instructores
 - Gestion de suscripcion de plataforma y estado de trial
 - Configuracion de planes/suscripciones para clientes
+- Configuracion de paleta visual para la presencia publica en marketplace
+- Edicion de pagina de marca con descripcion del estudio y servicios ofrecidos
 - Gestion de planes, pagos y comprobantes
 
 Reglas importantes:
@@ -99,7 +101,10 @@ Funciones principales:
 - Ver perfiles asociados por empresa
 - Asociarse a nuevas empresas del marketplace
 - Ver y realizar pagos de clases/membresias
+- Registrar pagos de membresias o suscripciones cobradas en efectivo
 - Consultar estado de pagos y link de checkout
+- Registrar asistencia en establecimiento mediante codigo QR
+- Puntuar establecimientos o sucursales donde tomo servicios
 
 ## 8. Flujo recomendado (owner)
 1. Crear empresa

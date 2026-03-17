@@ -12,6 +12,12 @@ from studio.modules.classes.views import (
 from studio.modules.core.views import EstablishmentViewSet, OrganizationViewSet, RoomViewSet
 from studio.modules.dashboard.views import dashboard_summary
 from studio.modules.payments.views import InvoiceViewSet, MembershipPlanViewSet, PaymentViewSet
+from studio.modules.social.views import (
+    SocialAccountViewSet,
+    SocialCampaignViewSet,
+    SocialPostViewSet,
+    social_workspace,
+)
 from studio.modules.students.views import StudentViewSet
 from studio.modules.users.views import (
     PlatformSettingViewSet,
@@ -34,6 +40,9 @@ router.register("classes", StudioClassViewSet, basename="class")
 router.register("membership-plans", MembershipPlanViewSet, basename="membership-plan")
 router.register("payments", PaymentViewSet, basename="payment")
 router.register("invoices", InvoiceViewSet, basename="invoice")
+router.register("social-accounts", SocialAccountViewSet, basename="social-account")
+router.register("social-posts", SocialPostViewSet, basename="social-post")
+router.register("social-campaigns", SocialCampaignViewSet, basename="social-campaign")
 router.register("students", StudentViewSet, basename="student")
 router.register("users", UserViewSet, basename="user")
 router.register("platform-settings", PlatformSettingViewSet, basename="platform-setting")
@@ -47,6 +56,7 @@ urlpatterns = [
     path("auth/register-student/", auth_register_student, name="auth-register-student"),
     path("auth/sso/google/", auth_sso_google, name="auth-sso-google"),
     path("auth/sso/facebook/", auth_sso_facebook, name="auth-sso-facebook"),
+    path("social/workspace/", social_workspace, name="social-workspace"),
     path("instructors/", instructor_collection, name="instructor-collection"),
     path("instructors/<int:profile_id>/", instructor_detail, name="instructor-detail"),
     path("instructor-settlements/", instructor_settlement_collection, name="instructor-settlement-collection"),
