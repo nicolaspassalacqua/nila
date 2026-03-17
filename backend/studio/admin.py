@@ -1,6 +1,8 @@
 ﻿from django.contrib import admin
 
 from .models import (
+    AIAssistantConfig,
+    AIAssistantInteraction,
     DashboardSnapshot,
     Establishment,
     InstructorProfile,
@@ -21,6 +23,20 @@ from .models import (
     StudentHistory,
     UserProfile,
 )
+
+
+@admin.register(AIAssistantConfig)
+class AIAssistantConfigAdmin(admin.ModelAdmin):
+    list_display = ("id", "organization", "provider", "model", "is_enabled", "updated_at")
+    list_filter = ("provider", "is_enabled")
+    search_fields = ("organization__name", "model")
+
+
+@admin.register(AIAssistantInteraction)
+class AIAssistantInteractionAdmin(admin.ModelAdmin):
+    list_display = ("id", "organization", "user", "provider", "model", "status", "created_at")
+    list_filter = ("provider", "status")
+    search_fields = ("organization__name", "user__username", "question", "answer")
 
 
 @admin.register(Organization)

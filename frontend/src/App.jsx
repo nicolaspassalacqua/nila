@@ -182,7 +182,7 @@ function createOrganizationEditFormState() {
     brand_color: "#ef4444",
     company_registry_id: "",
     currency: "ARS",
-    enabled_modules: ["configuracion", "pos", "alumnos", "clases", "instructores", "tutoriales", "tableros", "contactos", "redes_sociales"],
+    enabled_modules: ["configuracion", "pos", "alumnos", "clases", "instructores", "tutoriales", "tableros", "contactos", "redes_sociales", "ia_asistente"],
     fiscal_document_issued: false,
     mercadolibre_enabled: false,
     electronic_billing_enabled: false,
@@ -211,6 +211,25 @@ function createInstructorFormState() {
     currency: "ARS",
     started_at: "",
     notes: "",
+  };
+}
+
+function createAIAssistantConfigState() {
+  return {
+    id: "",
+    organization: "",
+    provider: "openai",
+    model: "gpt-5-mini",
+    api_key: "",
+    base_url: "",
+    system_prompt: "",
+    temperature: "0.2",
+    max_context_items: "8",
+    include_classes_context: true,
+    include_students_context: true,
+    include_finance_context: true,
+    include_instructors_context: true,
+    is_enabled: false,
   };
 }
 
@@ -361,6 +380,18 @@ const OWNER_MODULE_CATALOG = [
   { key: "tableros", label: "Tableros", icon: "chart" },
   { key: "contactos", label: "Contactos", icon: "contacts" },
   { key: "redes_sociales", label: "Redes sociales", icon: "megaphone" },
+  { key: "ia_asistente", label: "IA asistente", icon: "sparkles" },
+];
+const AI_PROVIDER_OPTIONS = [
+  { value: "openai", label: "OpenAI" },
+  { value: "gemini", label: "Gemini" },
+  { value: "ollama", label: "Ollama / local" },
+];
+const AI_QUICK_PROMPTS = [
+  "Como esta la ocupacion de clases programadas para los proximos 7 dias?",
+  "Que clases disponibles tengo mas proximas y en que sedes?",
+  "Resumen financiero: cobros aprobados, pendientes y costo de instructores.",
+  "Que instructores activos tengo y que esquema economico usan?",
 ];
 const ADMIN_PORTAL_TABS = [
   { key: "accesos", label: "Accesos" },
@@ -456,6 +487,13 @@ function ModuleGlyph({ icon }) {
           <path d="M4 12l10-4v8L4 12zM14 9v6" />
           <path d="M6 13l1.5 4h2l-1-3" />
           <path d="M17 10.5a3 3 0 0 1 0 3M19 9a5.2 5.2 0 0 1 0 6" />
+        </svg>
+      );
+    case "sparkles":
+      return (
+        <svg {...commonProps}>
+          <path d="M12 3l1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3L7.5 7.5l3.3-1.2L12 3z" />
+          <path d="M18.5 13.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8zM6 14l1 2.5 2.5 1-2.5 1L6 21l-1-2.5-2.5-1 2.5-1L6 14z" />
         </svg>
       );
     default:
@@ -1158,6 +1196,11 @@ function App() {
   const [socialAccounts, setSocialAccounts] = useState([]);
   const [socialPosts, setSocialPosts] = useState([]);
   const [socialCampaigns, setSocialCampaigns] = useState([]);
+  const [aiAssistantConfig, setAiAssistantConfig] = useState(createAIAssistantConfigState);
+  const [aiAssistantHistory, setAiAssistantHistory] = useState([]);
+  const [aiAssistantQuestion, setAiAssistantQuestion] = useState("");
+  const [aiAssistantLoading, setAiAssistantLoading] = useState(false);
+  const [aiAssistantFeedback, setAiAssistantFeedback] = useState("");
   const [discoverSearch, setDiscoverSearch] = useState("");
   const [discoverUserCoords, setDiscoverUserCoords] = useState(null);
   const [discoverLocationStatus, setDiscoverLocationStatus] = useState("idle");
@@ -2661,6 +2704,50 @@ function App() {
     setSocialCampaigns(Array.isArray(payload.campaigns) ? payload.campaigns : []);
   }
 
+  function hydrateAIAssistantConfig(payload, organizationId = "") {
+    if (!payload || typeof payload !== "object") {
+      return createAIAssistantConfigState();
+    }
+    return {
+      id: payload.id || "",
+      organization: String(payload.organization || organizationId || ""),
+      provider: payload.provider || "openai",
+      model: payload.model || (payload.provider === "gemini" ? "gemini-2.0-flash" : payload.provider === "ollama" ? "llama3.2" : "gpt-5-mini"),
+      api_key: payload.api_key || "",
+      base_url: payload.base_url || "",
+      system_prompt: payload.system_prompt || "",
+      temperature: String(payload.temperature ?? "0.2"),
+      max_context_items: String(payload.max_context_items ?? "8"),
+      include_classes_context: payload.include_classes_context !== false,
+      include_students_context: payload.include_students_context !== false,
+      include_finance_context: payload.include_finance_context !== false,
+      include_instructors_context: payload.include_instructors_context !== false,
+      is_enabled: !!payload.is_enabled,
+    };
+  }
+
+  async function loadOwnerAIAssistantData(organizationId = "") {
+    const query = organizationId ? `?organization_id=${organizationId}` : "";
+    const [configRes, historyRes] = await Promise.all([
+      request(`/api/ai-assistant/config/${query}`),
+      request(`/api/ai-assistant/history/${query}`),
+    ]);
+
+    if (configRes.ok) {
+      const configPayload = await configRes.json();
+      setAiAssistantConfig(hydrateAIAssistantConfig(configPayload, organizationId));
+    } else {
+      setAiAssistantConfig(createAIAssistantConfigState());
+    }
+
+    if (historyRes.ok) {
+      const historyPayload = await historyRes.json();
+      setAiAssistantHistory(Array.isArray(historyPayload) ? historyPayload : []);
+    } else {
+      setAiAssistantHistory([]);
+    }
+  }
+
   async function loadOwnerData() {
     const [
       summaryRes,
@@ -2737,6 +2824,57 @@ function App() {
     if (invoicesRes.ok) setInvoices(await invoicesRes.json());
     if (profilesRes.ok) setStudentProfiles(await profilesRes.json());
     loadMarketplaceData();
+  }
+
+  async function saveAIAssistantConfig(event) {
+    event.preventDefault();
+    if (!ownerOrganization?.id) return;
+    const payload = {
+      ...aiAssistantConfig,
+      organization_id: ownerOrganization.id,
+      temperature: Number(aiAssistantConfig.temperature || 0.2),
+      max_context_items: Number(aiAssistantConfig.max_context_items || 8),
+    };
+    const response = await request("/api/ai-assistant/config/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const detail = await extractErrorMessage(response, "No se pudo guardar la configuracion IA");
+      setAiAssistantFeedback(detail);
+      return;
+    }
+    const saved = await response.json();
+    setAiAssistantConfig(hydrateAIAssistantConfig(saved, ownerOrganization.id));
+    setAiAssistantFeedback("Configuracion IA guardada correctamente.");
+  }
+
+  async function askAIAssistant(customQuestion = "") {
+    const question = String(customQuestion || aiAssistantQuestion).trim();
+    if (!question || !ownerOrganization?.id) return;
+    setAiAssistantLoading(true);
+    setAiAssistantFeedback("");
+    const response = await request("/api/ai-assistant/ask/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        organization_id: ownerOrganization.id,
+        question,
+      }),
+    });
+    setAiAssistantLoading(false);
+    if (!response.ok) {
+      const detail = await extractErrorMessage(response, "No se pudo consultar el asistente IA");
+      setAiAssistantFeedback(detail);
+      return;
+    }
+    const payload = await response.json();
+    if (payload.interaction) {
+      setAiAssistantHistory((prev) => [payload.interaction, ...prev].slice(0, 30));
+    }
+    setAiAssistantQuestion("");
+    setAiAssistantFeedback("Consulta procesada correctamente.");
   }
 
   async function loadPortalData() {
@@ -4426,6 +4564,12 @@ function App() {
       currency: prev.currency || ownerOrganization.currency || "ARS",
     }));
   }, [ownerOrganization?.id, ownerOrganization?.currency]);
+
+  useEffect(() => {
+    if (me?.portal !== "owner" || !token || !ownerOrganization?.id) return;
+    if (ownerModule !== "ia_asistente") return;
+    loadOwnerAIAssistantData(String(ownerOrganization.id));
+  }, [token, me?.portal, ownerOrganization?.id, ownerModule]);
 
   useEffect(() => {
     if (me?.portal !== "owner" || !token) return;
@@ -8457,6 +8601,169 @@ function App() {
                 </article>
               </section>
             ) : null}
+          </div>
+        ) : null}
+
+        {ownerModule === "ia_asistente" ? (
+          <div className="ai-assistant-shell">
+            <section className="ai-assistant-hero panel-card">
+              <div>
+                <p className="eyebrow">Inteligencia operativa</p>
+                <h3>IA asistente del owner</h3>
+                <p className="panel-card-subline">
+                  Consulta clases, ocupacion, turnos, disponibilidad, alumnos, instructores y finanzas con contexto real de tu operacion.
+                </p>
+              </div>
+              <div className="ai-assistant-kpis">
+                <article><span>Proveedor</span><strong>{AI_PROVIDER_OPTIONS.find((option) => option.value === aiAssistantConfig.provider)?.label || "OpenAI"}</strong></article>
+                <article><span>Modelo</span><strong>{aiAssistantConfig.model || "-"}</strong></article>
+                <article><span>Estado</span><strong>{aiAssistantConfig.is_enabled ? "Activo" : "Inactivo"}</strong></article>
+              </div>
+            </section>
+
+            <section className="ai-assistant-grid">
+              <article className="panel-card ai-assistant-config">
+                <h3>Configuracion del proveedor</h3>
+                <form className="stack-sm" onSubmit={saveAIAssistantConfig}>
+                  <div className="form-grid two-columns">
+                    <label>Proveedor
+                      <select
+                        value={aiAssistantConfig.provider}
+                        onChange={(event) =>
+                          setAiAssistantConfig((prev) => ({
+                            ...prev,
+                            provider: event.target.value,
+                            model:
+                              event.target.value === "gemini"
+                                ? "gemini-2.0-flash"
+                                : event.target.value === "ollama"
+                                  ? "llama3.2"
+                                  : "gpt-5-mini",
+                          }))
+                        }
+                      >
+                        {AI_PROVIDER_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>Modelo
+                      <input
+                        value={aiAssistantConfig.model}
+                        onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, model: event.target.value }))}
+                        placeholder="gpt-5-mini | gemini-2.0-flash | llama3.2"
+                      />
+                    </label>
+                    <label>API key
+                      <input
+                        value={aiAssistantConfig.api_key}
+                        onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, api_key: event.target.value }))}
+                        placeholder={aiAssistantConfig.provider === "ollama" ? "No requerida si es local" : "Clave del proveedor"}
+                      />
+                    </label>
+                    <label>Base URL
+                      <input
+                        value={aiAssistantConfig.base_url}
+                        onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, base_url: event.target.value }))}
+                        placeholder={aiAssistantConfig.provider === "ollama" ? "http://localhost:11434" : "Opcional"}
+                      />
+                    </label>
+                    <label>Temperatura
+                      <input
+                        value={aiAssistantConfig.temperature}
+                        onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, temperature: event.target.value }))}
+                        placeholder="0.2"
+                      />
+                    </label>
+                    <label>Items de contexto
+                      <input
+                        value={aiAssistantConfig.max_context_items}
+                        onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, max_context_items: event.target.value }))}
+                        placeholder="8"
+                      />
+                    </label>
+                  </div>
+
+                  <label>Prompt del sistema
+                    <textarea
+                      rows={5}
+                      value={aiAssistantConfig.system_prompt}
+                      onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, system_prompt: event.target.value }))}
+                      placeholder="Instrucciones globales del asistente para este estudio."
+                    />
+                  </label>
+
+                  <div className="ai-assistant-toggle-grid">
+                    <label className="toggle-row">
+                      <span>Contexto de clases</span>
+                      <input type="checkbox" checked={aiAssistantConfig.include_classes_context} onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, include_classes_context: event.target.checked }))} />
+                    </label>
+                    <label className="toggle-row">
+                      <span>Contexto de alumnos</span>
+                      <input type="checkbox" checked={aiAssistantConfig.include_students_context} onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, include_students_context: event.target.checked }))} />
+                    </label>
+                    <label className="toggle-row">
+                      <span>Contexto financiero</span>
+                      <input type="checkbox" checked={aiAssistantConfig.include_finance_context} onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, include_finance_context: event.target.checked }))} />
+                    </label>
+                    <label className="toggle-row">
+                      <span>Contexto de instructores</span>
+                      <input type="checkbox" checked={aiAssistantConfig.include_instructors_context} onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, include_instructors_context: event.target.checked }))} />
+                    </label>
+                    <label className="toggle-row">
+                      <span>Modulo habilitado</span>
+                      <input type="checkbox" checked={aiAssistantConfig.is_enabled} onChange={(event) => setAiAssistantConfig((prev) => ({ ...prev, is_enabled: event.target.checked }))} />
+                    </label>
+                  </div>
+
+                  {aiAssistantFeedback ? <p className="info-note">{aiAssistantFeedback}</p> : null}
+                  <button type="submit">Guardar configuracion IA</button>
+                </form>
+              </article>
+
+              <article className="panel-card ai-assistant-chat">
+                <h3>Consulta al negocio</h3>
+                <p className="panel-card-subline">Preguntas sugeridas para obtener respuestas accionables dentro del estudio.</p>
+                <div className="ai-assistant-prompt-grid">
+                  {AI_QUICK_PROMPTS.map((prompt) => (
+                    <button key={prompt} type="button" className="secondary-btn" onClick={() => askAIAssistant(prompt)}>
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+                <label>Tu pregunta
+                  <textarea
+                    rows={4}
+                    value={aiAssistantQuestion}
+                    onChange={(event) => setAiAssistantQuestion(event.target.value)}
+                    placeholder="Ejemplo: Que clases con baja ocupacion tengo esta semana y en que sede conviene reforzar?"
+                  />
+                </label>
+                <button type="button" onClick={() => askAIAssistant()} disabled={aiAssistantLoading}>
+                  {aiAssistantLoading ? "Consultando..." : "Consultar asistente"}
+                </button>
+
+                <div className="ai-assistant-history">
+                  {aiAssistantHistory.length === 0 ? (
+                    <p className="empty-inline">Todavia no hay consultas registradas.</p>
+                  ) : aiAssistantHistory.map((interaction) => (
+                    <article key={interaction.id} className="ai-assistant-message">
+                      <div className="ai-assistant-message-head">
+                        <strong>{interaction.username || "Owner"}</strong>
+                        <small>{formatDateTimeLabel(interaction.created_at)}</small>
+                      </div>
+                      <p className="ai-assistant-question">{interaction.question}</p>
+                      <p className="ai-assistant-answer">
+                        {interaction.status === "error" ? interaction.error_message || "No se pudo resolver la consulta." : interaction.answer}
+                      </p>
+                      <span className={`status-badge ${interaction.status === "error" ? "danger" : "success"}`}>
+                        {interaction.provider_label || interaction.provider} | {interaction.model || "-"}
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            </section>
           </div>
         ) : null}
 

@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from studio.modules.assistant.views import ai_assistant_ask, ai_assistant_config, ai_assistant_history
 from studio.modules.classes.views import (
     StudioClassViewSet,
     instructor_collection,
@@ -56,6 +57,9 @@ urlpatterns = [
     path("auth/register-student/", auth_register_student, name="auth-register-student"),
     path("auth/sso/google/", auth_sso_google, name="auth-sso-google"),
     path("auth/sso/facebook/", auth_sso_facebook, name="auth-sso-facebook"),
+    path("ai-assistant/config/", ai_assistant_config, name="ai-assistant-config"),
+    path("ai-assistant/history/", ai_assistant_history, name="ai-assistant-history"),
+    path("ai-assistant/ask/", ai_assistant_ask, name="ai-assistant-ask"),
     path("social/workspace/", social_workspace, name="social-workspace"),
     path("instructors/", instructor_collection, name="instructor-collection"),
     path("instructors/<int:profile_id>/", instructor_detail, name="instructor-detail"),

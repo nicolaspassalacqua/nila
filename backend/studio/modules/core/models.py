@@ -2,7 +2,7 @@
 
 
 def default_enabled_modules():
-    return ["configuracion", "pos", "alumnos", "clases", "instructores", "tutoriales", "tableros", "contactos", "redes_sociales"]
+    return ["configuracion", "pos", "alumnos", "clases", "instructores", "tutoriales", "tableros", "contactos", "redes_sociales", "ia_asistente"]
 
 
 def default_weekly_hours():

@@ -1,7 +1,7 @@
 ﻿# NILA - Plataforma Inteligente para Estudios de Pilates
 
 Documento de Requerimientos Funcionales y No Funcionales (FRD + NFR)
-Version: `4.3`
+Version: `4.4`
 Autor: `Nicolas Passalacqua`
 Fecha: `2026-03-16`
 
@@ -145,6 +145,14 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 | FR-091 | Branding publico por establecimiento | El marketplace refleja colores, imagenes y contenido comercial definidos por cada owner | Sistema / Publico | Media |
 | FR-092 | Visibilidad publica de reputacion | Mostrar puntuacion promedio y volumen de calificaciones de establecimientos o sucursales | Sistema / Publico | Media |
 
+## 5.10 IA asistente owner
+| ID | Requerimiento | Descripcion | Actor | Prioridad |
+|---|---|---|---|---|
+| FR-093 | Configuracion de proveedor LLM | Owner configura proveedor IA, modelo, credenciales, prompt base y contexto a incluir | Owner | Alta |
+| FR-094 | Consulta operativa en lenguaje natural | Owner pregunta por clases, ocupacion, turnos, disponibilidad, alumnos, instructores y finanzas | Owner | Alta |
+| FR-095 | Conexion con multiples proveedores | El modulo puede operar con OpenAI, Gemini y una LLM local via Ollama | Sistema / Owner | Alta |
+| FR-096 | Historial de consultas IA | El sistema registra preguntas, respuestas y errores del asistente por organizacion | Sistema / Owner | Media |
+
 ## 6. Requerimientos no funcionales (NFR)
 
 ## 6.1 Seguridad
@@ -188,6 +196,8 @@ El sistema cubre gestion de organizaciones, sedes, salones, alumnos, clases, pag
 - La asistencia del alumno puede registrarse mediante codigo QR al ingresar al establecimiento.
 - Cada owner puede personalizar la presencia publica de su empresa con paleta visual, branding y servicios ofrecidos.
 - Las calificaciones de alumnos se registran por establecimiento o sucursal y deben quedar asociadas a una experiencia real del centro.
+- El asistente IA debe responder solo con contexto operativo real disponible para la organizacion activa y explicitar cuando falten datos.
+- La configuracion del asistente IA es propia de cada organizacion y puede variar proveedor, modelo y alcance del contexto.
 - Razon social se bloquea cuando existe emision fiscal.
 - Capacidad de clase no puede superar capacidad de salon.
 - Salon bloqueado o con conflicto horario no se puede asignar a clase.

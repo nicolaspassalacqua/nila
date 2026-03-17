@@ -107,6 +107,7 @@ class PlatformSubscriptionPlanSerializer(serializers.ModelSerializer):
             "tableros",
             "contactos",
             "redes_sociales",
+            "ia_asistente",
         }
         if value is None:
             return []

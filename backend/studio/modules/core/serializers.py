@@ -71,6 +71,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
                 "tableros",
                 "contactos",
                 "redes_sociales",
+                "ia_asistente",
             }
             if not isinstance(enabled_modules, list):
                 errors["enabled_modules"] = "enabled_modules debe ser una lista"

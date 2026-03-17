@@ -5,6 +5,7 @@ while each domain owns its own models file (Odoo-style modularization).
 """
 
 from studio.modules.core.models import Establishment, Organization, OrganizationMembership, Room
+from studio.modules.assistant.models import AIAssistantConfig, AIAssistantInteraction
 from studio.modules.classes.models import InstructorProfile, InstructorSettlement, StudioClass
 from studio.modules.dashboard.models import DashboardSnapshot
 from studio.modules.payments.models import Invoice, MembershipPlan, Payment
@@ -16,6 +17,8 @@ __all__ = [
     "Organization",
     "Establishment",
     "Room",
+    "AIAssistantConfig",
+    "AIAssistantInteraction",
     "InstructorProfile",
     "InstructorSettlement",
     "StudioClass",

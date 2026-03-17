@@ -1,5 +1,5 @@
 ﻿# Manual de Usuario - NILA
-Version: `1.2`
+Version: `1.3`
 Fecha: `2026-03-16`
 
 ## 1. Introduccion
@@ -89,6 +89,7 @@ Funciones principales:
 - Configuracion de planes/suscripciones para clientes
 - Configuracion de paleta visual para la presencia publica en marketplace
 - Edicion de pagina de marca con descripcion del estudio y servicios ofrecidos
+- Modulo de IA asistente para consultar operacion, clases, ocupacion y finanzas
 - Gestion de planes, pagos y comprobantes
 
 Reglas importantes:
